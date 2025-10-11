@@ -60,8 +60,8 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
     window.location.reload();
   };
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="h-screen flex flex-col p-8">
+      <div className="max-w-7xl mx-auto flex-1 flex flex-col">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold flex items-center gap-3">
             <Heart className="w-10 h-10 text-pokemon-red fill-pokemon-red" />
@@ -83,28 +83,30 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
         </div>
 
         {favorites.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-2xl text-muted-foreground mb-4">No favorites yet!</p>
-            <p className="text-muted-foreground">Swipe right on cards you like to add them to your collection.</p>
+          <div className="flex-1 flex items-center justify-center text-center">
+            <div>
+              <p className="text-2xl text-muted-foreground mb-4">No favorites yet!</p>
+              <p className="text-muted-foreground">Swipe right on cards you like to add them to your collection.</p>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {favorites.map((card) => (
-              <div key={card.id} className="relative group">
+              <div key={card.id} className="flex flex-col items-center">
                 <div className="transition-transform hover:scale-105">
                   <PokemonCard card={card} size="small" onClick={() => setSelected(card)} />
                 </div>
-                <Button
-                  onClick={() => onRemoveFavorite(card.id)}
-                  variant="destructive"
-                  size="sm"
-                  className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  Remove
-                </Button>
-                <div className="mt-2 text-center">
+                <div className="mt-2 text-center w-full">
                   <p className="font-semibold">{card.card.name}</p>
                   <p className="text-sm text-muted-foreground">{card.card.set.name}</p>
+                  <Button
+                    onClick={() => onRemoveFavorite(card.id)}
+                    variant="destructive"
+                    size="sm"
+                    className="mt-2 w-full"
+                  >
+                    Remove
+                  </Button>
                 </div>
               </div>
             ))}

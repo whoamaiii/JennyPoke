@@ -1,7 +1,7 @@
 import { /* useState removed (declared below) */ } from 'react';
 import { useSessionStorage } from '@/hooks/useSessionStorage';
 import { CardData } from '@/types/pokemon';
-import { openPack } from '@/services/pokemonTcgApi';
+import { openPack, testApiKey } from '@/services/pokemonTcgApi';
 import { Button } from '@/components/ui/button';
 import { CardViewer } from '@/components/CardViewer';
 import { PackOpening } from '@/components/PackOpening';
@@ -42,8 +42,14 @@ const Index = () => {
     setIsLoading(true);
     setError(null); // Clear any previous errors
 
+    console.log('🎯 Starting pack opening process...');
+    const startTime = Date.now();
+
     try {
       const cards = await openPack();
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`✅ Pack opened successfully in ${duration}s with ${cards.length} cards`);
+
       if (cards.length === 0) {
         throw new PokemonTCGError('No cards available. Please try again later.', 'NO_DATA');
       }
@@ -51,6 +57,9 @@ const Index = () => {
       setView('opening');
       toast.success('Pack opened! Swipe through your cards!');
     } catch (error) {
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.error(`❌ Pack opening failed after ${duration}s:`, error);
+
       const pokemonError = error instanceof PokemonTCGError ? error :
         new PokemonTCGError('An unexpected error occurred. Please try again.', 'UNKNOWN', error);
 
@@ -59,7 +68,7 @@ const Index = () => {
       // Show appropriate toast message based on error type
       switch (pokemonError.code) {
         case 'TIMEOUT':
-          toast.error('Request timed out. Please check your connection and try again.');
+          toast.error('Request timed out after 5 minutes. The API may be slow - please try again.');
           break;
         case 'NETWORK':
           toast.error('Connection failed. Please check your internet and try again.');
@@ -179,6 +188,35 @@ const Index = () => {
                 </>
               )}
             </Button>
+
+            <Button
+              onClick={async () => {
+                console.log('🧪 Testing API key...');
+                const success = await testApiKey();
+                if (success) {
+                  toast.success('API key is working! Check console for details.');
+                } else {
+                  toast.error('API key test failed. Check console for details.');
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="mt-4 text-sm"
+            >
+              Test API Key
+            </Button>
+
+            {isLoading && (
+              <div className="mt-4 p-4 bg-card/50 backdrop-blur border border-border/50 rounded-lg max-w-md">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                  <p className="text-sm font-medium">Fetching cards from API...</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  This may take up to 5 minutes due to API response times. Please wait...
+                </p>
+              </div>
+            )}
 
             {error && (
               <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg max-w-md">

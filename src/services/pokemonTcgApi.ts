@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { PokemonTCGCard, CardData } from '@/types/pokemon';
 
 const API_BASE = 'https://api.pokemontcg.io/v2';
-const API_TIMEOUT = 30000; // 10 seconds timeout
+const API_TIMEOUT = 300000; // 360 seconds timeout
 
 // Cache keys
 const CACHE_KEYS = {
@@ -69,7 +69,9 @@ const getHeaders = () => {
   // Prefer build-time Vite env var VITE_POKEMON_API_KEY, fall back to window global for runtime injection
   const apiKey = (import.meta.env as Record<string, string | undefined>).VITE_POKEMON_API_KEY ||
                  (window as unknown as Record<string, string | undefined>).POKEMON_API_KEY;
-  return apiKey ? { 'X-Api-Key': apiKey } : {};
+  const headers = apiKey ? { 'X-Api-Key': apiKey } : {};
+  console.log('🔑 API Key check:', apiKey ? `Present (${apiKey.substring(0, 8)}...)` : 'Not found');
+  return headers;
 };
 
 // Get headers without API key (for fallback)
@@ -83,30 +85,46 @@ const makeApiRequest = async (config: {
   params?: Record<string, string | number | boolean>;
   timeout?: number;
 }): Promise<import('axios').AxiosResponse> => {
+  console.log(`🌐 Making API request to: ${config.url}`);
+  const startTime = Date.now();
+
   // First try with API key
   try {
+    const headersWithKey = { ...config.headers, ...getHeaders() };
+    console.log('📤 Request headers:', Object.keys(headersWithKey).join(', '));
     const response = await axios({
       ...config,
-      headers: { ...config.headers, ...getHeaders() },
+      headers: headersWithKey,
       timeout: API_TIMEOUT,
     });
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`✅ API request completed in ${duration}s (with API key)`);
     return response;
   } catch (error) {
     // If it's an authentication error (401/403), try again without API key
     if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+      console.log('🔑 API key failed, trying without API key...');
       try {
+        const headersWithoutKey = { ...config.headers, ...getHeadersWithoutApiKey() };
+        console.log('📤 Fallback request headers:', Object.keys(headersWithoutKey).join(', ') || 'none');
         const response = await axios({
           ...config,
-          headers: { ...config.headers, ...getHeadersWithoutApiKey() },
+          headers: headersWithoutKey,
           timeout: API_TIMEOUT,
         });
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`✅ API request completed in ${duration}s (fallback without API key)`);
         return response;
       } catch (fallbackError) {
         // If fallback also fails, throw the original error
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.error(`❌ API request failed after ${duration}s:`, fallbackError);
         throw error;
       }
     }
     // If it's not an auth error, throw the original error
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.error(`❌ API request failed after ${duration}s:`, error);
     throw error;
   }
 };
@@ -118,7 +136,7 @@ const handleApiError = (error: unknown, operation: string): never => {
 
     if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
       throw new PokemonTCGError(
-        'Request timed out. Please check your internet connection and try again.',
+        'Request timed out after waiting 5 minutes. The Pokémon TCG API may be experiencing delays.',
         'TIMEOUT',
         axiosError
       );
@@ -393,3 +411,16 @@ export const getRandomPack = async (): Promise<CardData[]> => {
 };
 
 export const openPack = getRandomPack;
+
+// Temporary test function to verify API key
+export const testApiKey = async () => {
+  console.log('🧪 Testing API key functionality...');
+  try {
+    const randomSet = await getRandomSet();
+    console.log('✅ API key test successful! Retrieved set:', randomSet.name);
+    return true;
+  } catch (error) {
+    console.error('❌ API key test failed:', error);
+    return false;
+  }
+};
