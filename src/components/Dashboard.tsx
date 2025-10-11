@@ -67,16 +67,16 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
             <Heart className="w-10 h-10 text-pokemon-red fill-pokemon-red" />
             Your Collection
           </h1>
-          <div className="flex items-center gap-3">
-            <Button onClick={handleExport} variant="outline" className="flex items-center gap-2">
-              <Download className="w-4 h-4" />
-              Export Favorites → CSV
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={handleExport} variant="outline" size="sm" className="flex items-center gap-1 text-xs">
+              <Download className="w-3 h-3" />
+              Export CSV
             </Button>
-            <Button onClick={handleClearSession} variant="destructive" className="flex items-center gap-2">
-              <Trash className="w-4 h-4" />
+            <Button onClick={handleClearSession} variant="destructive" size="sm" className="flex items-center gap-1 text-xs">
+              <Trash className="w-3 h-3" />
               Clear Session
             </Button>
-            <Button onClick={onBackToHome} variant="outline">
+            <Button onClick={onBackToHome} variant="outline" size="sm" className="text-xs">
               Back to Home
             </Button>
           </div>
@@ -90,7 +90,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {favorites.map((card) => (
               <div key={card.id} className="flex flex-col items-center">
                 <div className="transition-transform hover:scale-105">
@@ -122,8 +122,14 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
               <DialogTitle>{selected.card.name}</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <img src={selected.card.images.large} alt={selected.card.name} className="w-full h-auto rounded-md" />
+              <div className="flex justify-center">
+                <div className="w-48 h-56">
+                  <img 
+                    src={selected.card.images.small || selected.card.images.large} 
+                    alt={selected.card.name} 
+                    className="w-full h-full object-cover rounded-md" 
+                  />
+                </div>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Set: {selected.card.set.name}</p>
