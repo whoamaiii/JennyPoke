@@ -4,16 +4,18 @@ import { CardData } from '@/types/pokemon';
 import { openPack } from '@/services/pokemonTcgApi';
 import { Button } from '@/components/ui/button';
 import { CardViewer } from '@/components/CardViewer';
-import { Dashboard } from '@/components/Dashboard';
 import { PackOpening } from '@/components/PackOpening';
 import { Sparkles, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import gsap from 'gsap';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense, lazy } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import pokeballSvg from '@/assets/pokeball.svg';
 import { PokemonTCGError } from '@/services/pokemonTcgApi';
+
+// Lazy load the Dashboard component since it's only used occasionally
+const Dashboard = lazy(() => import('@/components/Dashboard').then(module => ({ default: module.Dashboard })));
 
 type View = 'home' | 'opening' | 'viewing' | 'completed' | 'dashboard';
 
@@ -262,11 +264,17 @@ const Index = () => {
         )}
 
         {view === 'dashboard' && (
-          <Dashboard
-            favorites={favorites}
-            onRemoveFavorite={handleRemoveFavorite}
-            onBackToHome={() => setView('home')}
-          />
+          <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+            </div>
+          }>
+            <Dashboard
+              favorites={favorites}
+              onRemoveFavorite={handleRemoveFavorite}
+              onBackToHome={() => setView('home')}
+            />
+          </Suspense>
         )}
         </div>
 

@@ -11,6 +11,34 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React ecosystem
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // UI libraries
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tooltip'],
+          // Animation libraries
+          'animation-vendor': ['gsap'],
+          // Touch libraries
+          'touch-vendor': ['hammerjs'],
+          // HTTP libraries
+          'http-vendor': ['axios'],
+          // Theme libraries
+          'theme-vendor': ['next-themes'],
+          // Query libraries
+          'query-vendor': ['@tanstack/react-query'],
+          // Icon libraries
+          'icons-vendor': ['lucide-react'],
+          // Notification libraries
+          'notification-vendor': ['sonner'],
+        },
+      },
+    },
+    // Increase chunk size warning limit since we're now splitting
+    chunkSizeWarningLimit: 1000,
+  },
   plugins: [react(), mode === "development" && componentTagger(), VitePWA({
     manifest: {
       name: 'Pokémon Pack Opener',
