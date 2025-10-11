@@ -225,7 +225,7 @@ const Index = () => {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {isLoading 
-                    ? 'This may take up to 5 minutes due to API response times. Please wait...'
+                    ? 'This may take up to 7 minutes due to API response times. Please wait...'
                     : 'Checking API key configuration...'
                   }
                 </p>

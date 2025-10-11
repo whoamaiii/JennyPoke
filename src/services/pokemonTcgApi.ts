@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { PokemonTCGCard, CardData } from '@/types/pokemon';
 
 const API_BASE = 'https://api.pokemontcg.io/v2';
-const API_TIMEOUT = 300000; // 360 seconds timeout
+const API_TIMEOUT = 400000; // 400 seconds (6.67 minutes) timeout - more than double the observed 139.2s response time
 
 // Cache keys
 const CACHE_KEYS = {
@@ -130,7 +130,7 @@ const handleApiError = (error: unknown, operation: string): never => {
 
     if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
       throw new PokemonTCGError(
-        'Request timed out after waiting 5 minutes. The Pokémon TCG API may be experiencing delays.',
+        'Request timed out after waiting 7 minutes. The Pokémon TCG API may be experiencing delays.',
         'TIMEOUT',
         axiosError
       );
