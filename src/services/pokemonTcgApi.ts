@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { PokemonTCGCard, CardData } from '@/types/pokemon';
 
 const API_BASE = 'https://api.pokemontcg.io/v2';
-const API_TIMEOUT = 10000; // 10 seconds timeout
+const API_TIMEOUT = 30000; // 10 seconds timeout
 
 // Cache keys
 const CACHE_KEYS = {
@@ -12,7 +12,7 @@ const CACHE_KEYS = {
 };
 
 // Cache duration (24 hours in milliseconds)
-const CACHE_DURATION = 24 * 60 * 60 * 1000;
+const CACHE_DURATION = 48 * 60 * 60 * 1000;
 
 // Cache management functions
 const getCache = (key: string) => {
