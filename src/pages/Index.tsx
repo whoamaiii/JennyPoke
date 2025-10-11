@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { /* useState removed (declared below) */ } from 'react';
 import { useSessionStorage } from '@/hooks/useSessionStorage';
 import { CardData } from '@/types/pokemon';
 import { openPack } from '@/services/pokemonTcgApi';
@@ -8,6 +8,9 @@ import { Dashboard } from '@/components/Dashboard';
 import { PackOpening } from '@/components/PackOpening';
 import { Sparkles, Heart } from 'lucide-react';
 import { toast } from 'sonner';
+import gsap from 'gsap';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { useEffect, useRef, useState } from 'react';
 
 type View = 'home' | 'opening' | 'viewing' | 'completed' | 'dashboard';
 
@@ -16,6 +19,17 @@ const Index = () => {
   const [currentPack, setCurrentPack] = useSessionStorage<CardData[]>('currentPack', []);
   const [favorites, setFavorites] = useSessionStorage<CardData[]>('favorites', []);
   const [isLoading, setIsLoading] = useState(false);
+  const viewRootRef = useRef<HTMLDivElement | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  useEffect(() => {
+    if (!viewRootRef.current) return;
+    gsap.fromTo(
+      viewRootRef.current,
+      { opacity: 0, y: 12 },
+      { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' }
+    );
+  }, [view]);
 
   const handleOpenPack = async () => {
     setIsLoading(true);
@@ -63,7 +77,7 @@ const Index = () => {
       <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-primary" />
+            <img src="/pokeball.svg" alt="Pokéball" className="w-6 h-6" />
             <h1 className="text-2xl font-bold">Pokémon Pack Opener</h1>
           </div>
           
@@ -82,12 +96,17 @@ const Index = () => {
             >
               Collection ({favorites.length})
             </Button>
+            <Button variant="ghost" onClick={() => setHelpOpen(true)}>
+              Help
+            </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+        {/* view transition wrapper */}
+        <div id="view-root" ref={viewRootRef}>
         {view === 'home' && (
           <div className="flex flex-col items-center justify-center min-h-[80vh] text-center">
             <div className="mb-8 animate-float">
@@ -191,6 +210,26 @@ const Index = () => {
             onBackToHome={() => setView('home')}
           />
         )}
+        </div>
+
+        {/* Help modal (controlled) */}
+        <Dialog open={helpOpen} onOpenChange={(isOpen) => setHelpOpen(isOpen)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>How to use</DialogTitle>
+            </DialogHeader>
+            <DialogDescription>
+              <ul className="list-disc ml-6">
+                <li>Swipe → Next</li>
+                <li>Swipe ← Favourite</li>
+                <li>Press SPACE to flip card</li>
+              </ul>
+            </DialogDescription>
+            <DialogFooter>
+              <Button onClick={() => setHelpOpen(false)}>Got it</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

@@ -201,6 +201,17 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     }
   }, [currentIndex]);
 
+  // Prefetch next 2 images for smoothness
+  useEffect(() => {
+    const toPrefetch = [] as string[];
+    if (cards[currentIndex + 1]) toPrefetch.push(cards[currentIndex + 1].card.images.small || cards[currentIndex + 1].card.images.large);
+    if (cards[currentIndex + 2]) toPrefetch.push(cards[currentIndex + 2].card.images.small || cards[currentIndex + 2].card.images.large);
+    toPrefetch.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, [currentIndex, cards]);
+
   if (!currentCard) return null;
 
   return (

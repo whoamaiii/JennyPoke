@@ -5,7 +5,8 @@ const API_BASE = 'https://api.pokemontcg.io/v2';
 
 // Get API key from window if available
 const getHeaders = () => {
-  const apiKey = (window as any).POKEMON_API_KEY;
+  // Prefer build-time Vite env var VITE_POKEMON_API_KEY, fall back to window global for runtime injection
+  const apiKey = (import.meta as any).env?.VITE_POKEMON_API_KEY || (window as any).POKEMON_API_KEY;
   return apiKey ? { 'X-Api-Key': apiKey } : {};
 };
 
@@ -23,7 +24,7 @@ export const getCardsByRarity = async (rarity: string, limit: number = 10): Prom
       headers: getHeaders(),
       params: {
         q: `rarity:"${rarity}"`,
-        pageSize: limit,
+        pageSize: Math.min(limit, 25), // cap to 25 to keep response sizes small
         orderBy: '-set.releaseDate',
       },
     });

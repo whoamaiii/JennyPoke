@@ -37,6 +37,22 @@
   padding: 2em;
 }
 
+/* shine helper used for pack open */
+.shine {
+  filter: blur(8px);
+  opacity: 0.6;
+}
+
+@keyframes shine-sweep {
+  0% { transform: translateX(-120%); opacity: 0; }
+  10% { opacity: 0.6; }
+  60% { transform: translateX(120%); opacity: 0.6; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
+.shine.animate {
+  animation: shine-sweep 0.8s ease-in-out 0s 1;
+}
+
 .read-the-docs {
   color: #888;
 }

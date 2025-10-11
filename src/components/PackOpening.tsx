@@ -28,6 +28,11 @@ export const PackOpening = ({ onComplete }: PackOpeningProps) => {
         scale: 1.2,
         duration: 0.3,
       })
+      // add a shine sweep before it disappears
+      .to(packRef.current, {
+        boxShadow: '0 0 120px rgba(255,255,255,0.45)',
+        duration: 0.2,
+      })
       .to(packRef.current, {
         scale: 0,
         opacity: 0,
@@ -50,11 +55,15 @@ export const PackOpening = ({ onComplete }: PackOpeningProps) => {
         {/* Pack */}
         <div
           ref={packRef}
-          className="w-64 h-80 bg-gradient-to-br from-primary via-secondary to-accent rounded-3xl shadow-2xl flex items-center justify-center"
+          className="w-64 h-80 bg-gradient-to-br from-primary via-secondary to-accent rounded-3xl shadow-2xl flex items-center justify-center relative overflow-hidden"
         >
           <div className="text-center">
             <div className="text-6xl mb-4">🎴</div>
             <p className="text-xl font-bold text-white">Opening Pack...</p>
+          </div>
+          {/* shine overlay */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="shine w-24 h-full bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-0 transform -translate-x-1/2" />
           </div>
         </div>
 

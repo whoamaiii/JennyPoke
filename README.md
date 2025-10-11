@@ -71,3 +71,25 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Local development (recommended)
+
+Clone the repo and run the dev server with Node.js installed:
+
+```bash
+git clone <YOUR_GIT_URL>
+cd <YOUR_PROJECT_NAME>
+npm install
+npm run dev
+```
+
+Build for production:
+
+```bash
+npm run build
+npm run preview
+```
+
+Notes:
+- This project includes a `manifest.json` and `favicon.ico` for simple PWA-like behavior (installable / splash).
+- Favorites are stored in `sessionStorage` under the key `favorites`. Use the Collection view to export CSV or clear session.
