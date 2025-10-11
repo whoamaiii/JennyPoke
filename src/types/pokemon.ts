@@ -1,34 +1,26 @@
-export interface Pokemon {
-  id: number;
+export interface PokemonTCGCard {
+  id: string;
   name: string;
-  sprites: {
-    front_default: string;
-    other: {
-      'official-artwork': {
-        front_default: string;
-      };
-      dream_world: {
-        front_default: string;
-      };
-    };
+  set: {
+    name: string;
   };
-  types: Array<{
-    type: {
-      name: string;
-    };
-  }>;
-  height: number;
-  weight: number;
-  stats: Array<{
-    base_stat: number;
-    stat: {
-      name: string;
-    };
+  number: string;
+  rarity: string;
+  images: {
+    small: string;
+    large: string;
+  };
+  supertype?: string;
+  hp?: string;
+  types?: string[];
+  attacks?: Array<{
+    name: string;
+    damage: string;
   }>;
 }
 
 export interface CardData {
   id: string;
-  pokemon: Pokemon;
+  card: PokemonTCGCard;
   rarity: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
 }

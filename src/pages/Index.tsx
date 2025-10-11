@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSessionStorage } from '@/hooks/useSessionStorage';
 import { CardData } from '@/types/pokemon';
-import { openPack } from '@/services/pokemonApi';
+import { openPack } from '@/services/pokemonTcgApi';
 import { Button } from '@/components/ui/button';
 import { CardViewer } from '@/components/CardViewer';
 import { Dashboard } from '@/components/Dashboard';
@@ -37,7 +37,7 @@ const Index = () => {
       const card = currentPack.find((c) => c.id === cardId);
       if (card) {
         setFavorites([...favorites, card]);
-        toast.success(`Added ${card.pokemon.name} to favorites!`, {
+        toast.success(`Added ${card.card.name} to favorites!`, {
           icon: <Heart className="w-4 h-4" fill="currentColor" />,
         });
       }
@@ -53,7 +53,7 @@ const Index = () => {
     const card = favorites.find((c) => c.id === cardId);
     setFavorites(favorites.filter((c) => c.id !== cardId));
     if (card) {
-      toast.info(`Removed ${card.pokemon.name} from favorites`);
+      toast.info(`Removed ${card.card.name} from favorites`);
     }
   };
 
@@ -153,8 +153,8 @@ const Index = () => {
         {view === 'dashboard' && (
           <Dashboard
             favorites={favorites}
-            onRemove={handleRemoveFavorite}
-            onOpenPack={handleOpenPack}
+            onRemoveFavorite={handleRemoveFavorite}
+            onBackToHome={() => setView('home')}
           />
         )}
       </main>
