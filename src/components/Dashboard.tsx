@@ -1,10 +1,9 @@
 import { CardData } from '@/types/pokemon';
 import { PokemonCard } from './PokemonCard';
 import { Button } from './ui/button';
-import { Heart } from 'lucide-react';
+import { Heart, Trash, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { useState, useMemo } from 'react';
-import { Trash, Download } from 'lucide-react';
 
 function exportFavoritesAsCSV(favorites: CardData[]) {
   if (!favorites || favorites.length === 0) return;
@@ -127,7 +126,11 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
               <div>
                 <p className="text-sm text-muted-foreground">Set: {selected.card.set.name}</p>
                 <p className="text-sm text-muted-foreground">Rarity: {selected.rarity || 'Unknown'}</p>
-                <p className="mt-4">{selected.card.flavorText || selected.card.abilities?.[0]?.text || ''}</p>
+                <p className="mt-4">
+                  {selected.card.attacks?.[0]?.name ? 
+                    `Attack: ${selected.card.attacks[0].name} (${selected.card.attacks[0].damage})` : 
+                    'No attack information available'}
+                </p>
               </div>
             </div>
             <DialogFooter>
