@@ -91,7 +91,7 @@ const makeApiRequest = async (config: {
   headers?: Record<string, string>;
   params?: Record<string, string | number | boolean>;
   timeout?: number;
-}): Promise<import('axios').AxiosResponse> => {
+}, signal?: AbortSignal): Promise<import('axios').AxiosResponse> => {
   console.log(`🌐 Making API request to: ${config.url}`);
   const startTime = Date.now();
 
@@ -105,6 +105,7 @@ const makeApiRequest = async (config: {
       url: finalUrl,
       headers: { ...config.headers, ...getHeaders() },
       timeout: API_TIMEOUT,
+      signal, // Add abort signal
     });
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`✅ API request completed in ${duration}s (with API key)`);
@@ -119,6 +120,7 @@ const makeApiRequest = async (config: {
           url: finalUrl,
           headers: { ...config.headers, ...getHeadersWithoutApiKey() },
           timeout: API_TIMEOUT,
+          signal, // Add abort signal
         });
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
         console.log(`✅ API request completed in ${duration}s (fallback without API key)`);
@@ -197,7 +199,7 @@ const handleApiError = (error: unknown, operation: string): never => {
   );
 };
 
-const getRandomSet = async () => {
+const getRandomSet = async (signal?: AbortSignal) => {
   // Clear expired cache on first call
   clearExpiredCache();
 
@@ -214,7 +216,7 @@ const getRandomSet = async () => {
           q: 'legalities.standard:legal', // only standard legal sets
           orderBy: '-releaseDate',
         },
-      });
+      }, signal);
       sets = response.data.data || [];
       if (sets.length > 0) {
         setCache(CACHE_KEYS.SETS, sets);
@@ -326,7 +328,7 @@ const generatePack = (commonCards: PokemonTCGCard[], uncommonCards: PokemonTCGCa
   return pack;
 };
 
-export const getCardsByRarity = async (rarity: string, limit: number = 10, setId?: string): Promise<PokemonTCGCard[]> => {
+export const getCardsByRarity = async (rarity: string, limit: number = 10, setId?: string, signal?: AbortSignal): Promise<PokemonTCGCard[]> => {
   // Clear expired cache on first call
   clearExpiredCache();
 
@@ -357,7 +359,7 @@ export const getCardsByRarity = async (rarity: string, limit: number = 10, setId
       url: `${API_BASE}/cards`,
       method: 'GET',
       params,
-    });
+    }, signal);
     const cards = response.data.data || [];
 
     // Cache the results
@@ -372,10 +374,10 @@ export const getCardsByRarity = async (rarity: string, limit: number = 10, setId
   }
 };
 
-export const getRandomPack = async (): Promise<CardData[]> => {
+export const getRandomPack = async (signal?: AbortSignal): Promise<CardData[]> => {
   try {
     // Get a random set
-    const randomSet = await getRandomSet();
+    const randomSet = await getRandomSet(signal);
     if (!randomSet) {
       throw new PokemonTCGError('Unable to find a valid card set. Please try again.', 'NO_DATA');
     }
@@ -383,18 +385,18 @@ export const getRandomPack = async (): Promise<CardData[]> => {
 
     // Fetch cards by rarity from the same set
     const [commonCards, uncommonCards, rareCards] = await Promise.all([
-      getCardsByRarity('Common', 20, setId),
-      getCardsByRarity('Uncommon', 12, setId),
-      getCardsByRarity('Rare', 8, setId),
+      getCardsByRarity('Common', 20, setId, signal),
+      getCardsByRarity('Uncommon', 12, setId, signal),
+      getCardsByRarity('Rare', 8, setId, signal),
     ]);
 
     // If not enough cards from set, fall back to general
     if (commonCards.length < 5 || uncommonCards.length < 2) {
       // Fall back to general cards
       const [fallbackCommons, fallbackUncommons, fallbackRares] = await Promise.all([
-        getCardsByRarity('Common', 20),
-        getCardsByRarity('Uncommon', 12),
-        getCardsByRarity('Rare', 8),
+        getCardsByRarity('Common', 20, undefined, signal),
+        getCardsByRarity('Uncommon', 12, undefined, signal),
+        getCardsByRarity('Rare', 8, undefined, signal),
       ]);
 
       if (fallbackCommons.length < 5) {

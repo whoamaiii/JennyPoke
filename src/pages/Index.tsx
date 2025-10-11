@@ -28,6 +28,7 @@ const Index = () => {
   const viewRootRef = useRef<HTMLDivElement | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [isTestingApi, setIsTestingApi] = useState(false);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   useEffect(() => {
     if (!viewRootRef.current) return;
@@ -38,8 +39,34 @@ const Index = () => {
     );
   }, [view]);
 
+  // Cancel ongoing requests when navigating away from home
+  useEffect(() => {
+    if (view !== 'home' && abortController) {
+      console.log('🚫 Cancelling ongoing pack opening request due to navigation');
+      abortController.abort();
+      setAbortController(null);
+      setIsLoading(false);
+      setError(null);
+    }
+  }, [view, abortController]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortController) {
+        console.log('🚫 Cancelling ongoing pack opening request due to component unmount');
+        abortController.abort();
+      }
+    };
+  }, [abortController]);
+
   const handleOpenPack = async () => {
     if (isLoading || isTestingApi) return; // prevent multiple clicks and simultaneous operations
+    
+    // Create new abort controller for this request
+    const controller = new AbortController();
+    setAbortController(controller);
+    
     setIsLoading(true);
     setError(null); // Clear any previous errors
 
@@ -47,7 +74,7 @@ const Index = () => {
     const startTime = Date.now();
 
     try {
-      const cards = await openPack();
+      const cards = await openPack(controller.signal);
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log(`✅ Pack opened successfully in ${duration}s with ${cards.length} cards`);
 
@@ -59,6 +86,13 @@ const Index = () => {
       toast.success('Pack opened! Swipe through your cards!');
     } catch (error) {
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      
+      // Handle request cancellation
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log(`🛑 Pack opening cancelled after ${duration}s (user navigated away)`);
+        return; // Don't show error for cancelled requests
+      }
+      
       console.error(`❌ Pack opening failed after ${duration}s:`, error);
 
       const pokemonError = error instanceof PokemonTCGError ? error :
@@ -69,7 +103,7 @@ const Index = () => {
       // Show appropriate toast message based on error type
       switch (pokemonError.code) {
         case 'TIMEOUT':
-          toast.error('Request timed out after 5 minutes. The API may be slow - please try again.');
+          toast.error('Request timed out after 7 minutes. The API may be slow - please try again.');
           break;
         case 'NETWORK':
           toast.error('Connection failed. Please check your internet and try again.');
@@ -87,6 +121,7 @@ const Index = () => {
       console.error('Pack opening error:', pokemonError);
     } finally {
       setIsLoading(false);
+      setAbortController(null); // Clean up abort controller
     }
   };
 
