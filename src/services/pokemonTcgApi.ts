@@ -2,7 +2,16 @@ import axios, { AxiosError } from 'axios';
 import { PokemonTCGCard, CardData } from '@/types/pokemon';
 
 const API_BASE = 'https://api.pokemontcg.io/v2';
+// CORS proxy for development - remove in production and use backend API
+const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
+const USE_CORS_PROXY = false; // Set to false in production
+
 const API_TIMEOUT = 400000; // 400 seconds (6.67 minutes) timeout - more than double the observed 139.2s response time
+
+// Development warning for CORS proxy usage
+if (USE_CORS_PROXY) {
+  console.warn('⚠️ Using CORS proxy for development. This should be disabled in production and replaced with a backend API.');
+}
 
 // Cache keys
 const CACHE_KEYS = {
@@ -86,10 +95,14 @@ const makeApiRequest = async (config: {
   console.log(`🌐 Making API request to: ${config.url}`);
   const startTime = Date.now();
 
+  // Apply CORS proxy if enabled
+  const finalUrl = USE_CORS_PROXY ? `${CORS_PROXY}${config.url}` : config.url;
+
   // First try with API key
   try {
     const response = await axios({
       ...config,
+      url: finalUrl,
       headers: { ...config.headers, ...getHeaders() },
       timeout: API_TIMEOUT,
     });
@@ -103,6 +116,7 @@ const makeApiRequest = async (config: {
       try {
         const response = await axios({
           ...config,
+          url: finalUrl,
           headers: { ...config.headers, ...getHeadersWithoutApiKey() },
           timeout: API_TIMEOUT,
         });
