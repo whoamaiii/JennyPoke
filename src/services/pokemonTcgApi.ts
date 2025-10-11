@@ -24,6 +24,45 @@ const getHeaders = () => {
   return apiKey ? { 'X-Api-Key': apiKey } : {};
 };
 
+// Get headers without API key (for fallback)
+const getHeadersWithoutApiKey = () => ({});
+
+// Helper function to make API requests with fallback
+const makeApiRequest = async (config: {
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  params?: Record<string, string | number | boolean>;
+  timeout?: number;
+}): Promise<import('axios').AxiosResponse> => {
+  // First try with API key
+  try {
+    const response = await axios({
+      ...config,
+      headers: { ...config.headers, ...getHeaders() },
+      timeout: API_TIMEOUT,
+    });
+    return response;
+  } catch (error) {
+    // If it's an authentication error (401/403), try again without API key
+    if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+      try {
+        const response = await axios({
+          ...config,
+          headers: { ...config.headers, ...getHeadersWithoutApiKey() },
+          timeout: API_TIMEOUT,
+        });
+        return response;
+      } catch (fallbackError) {
+        // If fallback also fails, throw the original error
+        throw error;
+      }
+    }
+    // If it's not an auth error, throw the original error
+    throw error;
+  }
+};
+
 // Helper function to handle axios errors and convert to custom errors
 const handleApiError = (error: unknown, operation: string): never => {
   if (axios.isAxiosError(error)) {
@@ -86,11 +125,11 @@ const handleApiError = (error: unknown, operation: string): never => {
 
 const getRandomSet = async () => {
   try {
-    const response = await axios.get(`${API_BASE}/sets`, {
-      headers: getHeaders(),
-      timeout: API_TIMEOUT,
+    const response = await makeApiRequest({
+      url: `${API_BASE}/sets`,
+      method: 'GET',
       params: {
-        pageSize: 1,
+        pageSize: '1',
         orderBy: '-releaseDate',
         q: 'legalities.standard:legal', // only standard legal sets
       },
@@ -194,7 +233,7 @@ const generatePack = (commonCards: PokemonTCGCard[], uncommonCards: PokemonTCGCa
 
 export const getCardsByRarity = async (rarity: string, limit: number = 10, setId?: string): Promise<PokemonTCGCard[]> => {
   try {
-    const params: { q: string; pageSize: number; orderBy?: string } = {
+    const params: Record<string, string | number | boolean> = {
       q: `rarity:"${rarity}"`,
       pageSize: Math.min(limit, 25), // cap to 25 to keep response sizes small
     };
@@ -203,9 +242,9 @@ export const getCardsByRarity = async (rarity: string, limit: number = 10, setId
     } else {
       params.orderBy = '-set.releaseDate';
     }
-    const response = await axios.get(`${API_BASE}/cards`, {
-      headers: getHeaders(),
-      timeout: API_TIMEOUT,
+    const response = await makeApiRequest({
+      url: `${API_BASE}/cards`,
+      method: 'GET',
       params,
     });
     return response.data.data || [];
