@@ -8,20 +8,20 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 220 30% 96%;
-    --foreground: 220 20% 10%;
+  --background: 210 60% 98%; /* very light pastel blue */
+  --foreground: 215 20% 12%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 215 20% 12%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 215 20% 12%;
 
-    --primary: 45 100% 51%;
-    --primary-foreground: 220 20% 10%;
+  --primary: 210 70% 70%; /* pastel blue */
+  --primary-foreground: 220 20% 12%;
 
-    --secondary: 217 91% 60%;
-    --secondary-foreground: 0 0% 100%;
+  --secondary: 50 90% 70%; /* pastel yellow */
+  --secondary-foreground: 220 20% 12%;
 
     --muted: 220 30% 90%;
     --muted-foreground: 220 20% 45%;
@@ -38,11 +38,11 @@ All colors MUST be HSL.
 
     --radius: 1rem;
     
-    --gradient-primary: linear-gradient(135deg, hsl(45 100% 51%), hsl(30 100% 55%));
-    --gradient-secondary: linear-gradient(135deg, hsl(217 91% 60%), hsl(230 80% 65%));
-    --gradient-card: linear-gradient(180deg, hsl(220 30% 98%), hsl(220 30% 92%));
-    
-    --shadow-card: 0 8px 32px -8px hsl(45 100% 51% / 0.3);
+  --gradient-primary: linear-gradient(135deg, hsl(210 70% 75%), hsl(205 60% 68%));
+  --gradient-secondary: linear-gradient(135deg, hsl(50 90% 78%), hsl(45 90% 66%));
+  --gradient-card: linear-gradient(180deg, hsl(210 60% 98%), hsl(210 60% 94%));
+
+  --shadow-card: 0 8px 32px -8px hsl(210 70% 70% / 0.12);
     --shadow-elevated: 0 20px 60px -10px hsl(220 20% 10% / 0.2);
     
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

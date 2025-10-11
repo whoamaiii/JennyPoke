@@ -93,3 +93,7 @@ npm run preview
 Notes:
 - This project includes a `manifest.json` and `favicon.ico` for simple PWA-like behavior (installable / splash).
 - Favorites are stored in `sessionStorage` under the key `favorites`. Use the Collection view to export CSV or clear session.
+
+API key:
+- The Pokémon TCG API requires an API key for higher rate limits. You can provide it at build time using a Vite env var named `VITE_POKEMON_API_KEY` (create a `.env` file at the repo root with `VITE_POKEMON_API_KEY=your_key`).
+- For runtime injection (for example if you deploy somewhere without rebuilding), you can also set `window.POKEMON_API_KEY = 'your_key'` in a script tag before the app boots.

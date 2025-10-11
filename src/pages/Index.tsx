@@ -109,9 +109,9 @@ const Index = () => {
         <div id="view-root" ref={viewRootRef}>
         {view === 'home' && (
           <div className="flex flex-col items-center justify-center min-h-[80vh] text-center">
-            <div className="mb-8 animate-float">
-              <div className="text-9xl mb-4">🎴</div>
-            </div>
+            <div className="mb-8">
+                <img src="/pokeball.svg" alt="Pokéball" className="w-28 h-28 mb-4 mx-auto" />
+              </div>
             
             <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
               Open Your Pokémon Pack

@@ -38,10 +38,11 @@ export const getCardsByRarity = async (rarity: string, limit: number = 10): Prom
 export const getRandomPack = async (): Promise<CardData[]> => {
   try {
     // Fetch cards by rarity with larger pools
+    // smaller pools fetched to reduce latency
     const [commonCards, uncommonCards, rareCards] = await Promise.all([
-      getCardsByRarity('Common', 50),
-      getCardsByRarity('Uncommon', 30),
-      getCardsByRarity('Rare', 20),
+      getCardsByRarity('Common', 20),
+      getCardsByRarity('Uncommon', 12),
+      getCardsByRarity('Rare', 8),
     ]);
 
     // Shuffle and pick cards
