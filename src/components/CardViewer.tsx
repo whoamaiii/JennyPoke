@@ -3,7 +3,7 @@ import Hammer from 'hammerjs';
 import gsap from 'gsap';
 import { CardData } from '@/types/pokemon';
 import { PokemonCard } from './PokemonCard';
-import { Heart, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Heart, ArrowLeft, ArrowRight, X } from 'lucide-react';
 
 interface CardViewerProps {
   cards: CardData[];
@@ -13,14 +13,15 @@ interface CardViewerProps {
 
 export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
+  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set()); // Start with all cards flipped (showing back)
   const [isAnimating, setIsAnimating] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const heartRef = useRef<HTMLDivElement>(null);
+  const skipRef = useRef<HTMLDivElement>(null);
 
   const currentCard = cards[currentIndex];
-  const isFlipped = flippedCards.has(currentIndex);
+  const isFlipped = flippedCards.has(currentIndex); // This will be false initially (showing back)
 
   const animateHeart = () => {
     if (heartRef.current) {
@@ -32,13 +33,41 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           rotation: -180,
         },
         {
-          scale: 1.5,
+          scale: 1,
           opacity: 1,
           rotation: 0,
           duration: 0.4,
           ease: 'back.out(1.7)',
           onComplete: () => {
             gsap.to(heartRef.current, {
+              scale: 0,
+              opacity: 0,
+              duration: 0.3,
+              delay: 0.2,
+            });
+          },
+        }
+      );
+    }
+  };
+
+  const animateSkip = () => {
+    if (skipRef.current) {
+      gsap.fromTo(
+        skipRef.current,
+        {
+          scale: 0,
+          opacity: 0,
+          rotation: 180,
+        },
+        {
+          scale: 1,
+          opacity: 1,
+          rotation: 0,
+          duration: 0.4,
+          ease: 'back.out(1.7)',
+          onComplete: () => {
+            gsap.to(skipRef.current, {
               scale: 0,
               opacity: 0,
               duration: 0.3,
@@ -58,6 +87,8 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
     if (isFavorite) {
       animateHeart();
+    } else {
+      animateSkip();
     }
 
     const xOffset = direction === 'left' ? -window.innerWidth : window.innerWidth;
@@ -107,7 +138,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
     if (cardRef.current) {
       gsap.to(cardRef.current, {
-        rotationY: isFlipped ? 0 : 180,
+        rotationY: isFlipped ? 180 : 0, // Flip from 0 to 180 when unflipping (showing front), from 180 to 0 when flipping (showing back)
         duration: 0.6,
         ease: 'power2.inOut',
       });
@@ -228,14 +259,15 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
       {/* Current card */}
       <div
         ref={cardRef}
-        className="relative cursor-grab active:cursor-grabbing"
+        className="relative cursor-pointer"
         style={{
           perspective: '1000px',
           transformStyle: 'preserve-3d',
         }}
+        onClick={toggleFlip}
       >
         <div style={{ backfaceVisibility: 'hidden' }}>
-          <PokemonCard card={currentCard} showBack={isFlipped} />
+          <PokemonCard card={currentCard} showBack={!isFlipped} />
         </div>
       </div>
 
@@ -245,18 +277,20 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         className="absolute pointer-events-none"
         style={{ opacity: 0 }}
       >
-        <Heart className="w-32 h-32 text-pokemon-red fill-pokemon-red drop-shadow-2xl" />
+        <Heart className="w-16 h-16 text-red-500 fill-red-500 drop-shadow-2xl" />
       </div>
 
-      {/* Counter */}
-      <div className="absolute bottom-32 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur px-6 py-3 rounded-full shadow-lg border border-border">
-        <p className="text-sm font-semibold">
-          {currentIndex + 1} / {cards.length}
-        </p>
+      {/* Skip animation overlay */}
+      <div
+        ref={skipRef}
+        className="absolute pointer-events-none"
+        style={{ opacity: 0 }}
+      >
+        <X className="w-16 h-16 text-gray-500 drop-shadow-2xl" />
       </div>
 
       {/* Instructions */}
-      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+      <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
         <div className="flex gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2 bg-card/80 backdrop-blur px-4 py-2 rounded-full">
             <ArrowLeft className="w-4 h-4" />
@@ -268,7 +302,14 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           </div>
         </div>
         <p className="text-xs text-muted-foreground bg-card/80 backdrop-blur px-4 py-2 rounded-full">
-          Press SPACE to flip card
+          Click card to flip • Press SPACE to flip
+        </p>
+      </div>
+
+      {/* Counter */}
+      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur px-6 py-3 rounded-full shadow-lg border border-border">
+        <p className="text-sm font-semibold">
+          {currentIndex + 1} / {cards.length}
         </p>
       </div>
     </div>

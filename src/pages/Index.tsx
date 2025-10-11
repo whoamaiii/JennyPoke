@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import gsap from 'gsap';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useEffect, useRef, useState } from 'react';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import pokeballSvg from '@/assets/pokeball.svg';
 
 type View = 'home' | 'opening' | 'viewing' | 'completed' | 'dashboard';
 
@@ -32,6 +34,7 @@ const Index = () => {
   }, [view]);
 
   const handleOpenPack = async () => {
+    if (isLoading) return; // prevent multiple clicks
     setIsLoading(true);
     try {
       const cards = await openPack();
@@ -77,7 +80,7 @@ const Index = () => {
       <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <img src="/pokeball.svg" alt="Pokéball" className="w-6 h-6" />
+            <img src={pokeballSvg} alt="Pokéball" className="w-6 h-6" />
             <h1 className="text-2xl font-bold">Pokémon Pack Opener</h1>
           </div>
           
@@ -96,6 +99,7 @@ const Index = () => {
             >
               Collection ({favorites.length})
             </Button>
+            <ThemeToggle />
             <Button variant="ghost" onClick={() => setHelpOpen(true)}>
               Help
             </Button>
@@ -104,13 +108,13 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="flex-1 flex items-center justify-center px-4 py-8">
         {/* view transition wrapper */}
-        <div id="view-root" ref={viewRootRef}>
+        <div id="view-root" ref={viewRootRef} className="w-full max-w-4xl">
         {view === 'home' && (
           <div className="flex flex-col items-center justify-center min-h-[80vh] text-center">
             <div className="mb-8">
-                <img src="/pokeball.svg" alt="Pokéball" className="w-28 h-28 mb-4 mx-auto" />
+                <img src={pokeballSvg} alt="Pokéball" className="w-28 h-28 mb-4 mx-auto" />
               </div>
             
             <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
@@ -118,7 +122,7 @@ const Index = () => {
             </h2>
             
             <p className="text-xl text-muted-foreground mb-8 max-w-md">
-              Discover 10 random Pokémon cards. Swipe right to save your favorites!
+              Discover 8 random Pokémon cards. Swipe right to save your favorites!
             </p>
             
             <Button
@@ -160,7 +164,7 @@ const Index = () => {
         )}
 
         {view === 'viewing' && currentPack.length > 0 && (
-          <div className="min-h-[80vh]">
+          <div className="w-full">
             <CardViewer
               cards={currentPack}
               onSwipe={handleSwipe}
@@ -220,6 +224,7 @@ const Index = () => {
             </DialogHeader>
             <DialogDescription>
               <ul className="list-disc ml-6">
+                <li>Click card to flip and reveal</li>
                 <li>Swipe → Next</li>
                 <li>Swipe ← Favourite</li>
                 <li>Press SPACE to flip card</li>

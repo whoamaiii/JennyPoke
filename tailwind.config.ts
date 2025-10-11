@@ -48,7 +48,7 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
+          background: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
           primary: "hsl(var(--sidebar-primary))",
           "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
@@ -57,6 +57,9 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        "pokemon-red": "hsl(210 70% 50%)",
+        "pokemon-yellow": "hsl(220 60% 70%)",
+        "pokemon-blue": "hsl(210 80% 60%)",
       },
       borderRadius: {
         lg: "var(--radius)",

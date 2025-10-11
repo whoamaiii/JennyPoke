@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { Loader2 } from 'lucide-react';
+import pokeballSvg from '@/assets/pokeball.svg';
 
 interface PackOpeningProps {
   onComplete: () => void;
@@ -58,7 +59,7 @@ export const PackOpening = ({ onComplete }: PackOpeningProps) => {
           className="w-64 h-80 bg-gradient-to-br from-primary via-secondary to-accent rounded-3xl shadow-2xl flex items-center justify-center relative overflow-hidden"
         >
           <div className="text-center">
-            <img src="/pokeball.svg" alt="Pokéball" className="w-16 h-16 mx-auto mb-4" />
+            <img src={pokeballSvg} alt="Pokéball" className="w-16 h-16 mx-auto mb-4" />
             <p className="text-xl font-bold text-white">Opening Pack...</p>
           </div>
           {/* shine overlay */}
@@ -73,7 +74,7 @@ export const PackOpening = ({ onComplete }: PackOpeningProps) => {
           className="absolute inset-0 flex items-center justify-center opacity-0 scale-0"
         >
           <div className="relative">
-            {[...Array(10)].map((_, i) => (
+            {[...Array(8)].map((_, i) => (
               <div
                 key={i}
                 className="absolute w-16 h-24 bg-card rounded-lg shadow-lg"

@@ -14,10 +14,10 @@ interface PokemonCardProps {
 }
 
 const rarityColors: Record<string, string> = {
-  common: 'from-gray-400 to-gray-600',
-  uncommon: 'from-green-400 to-green-600',
-  rare: 'from-blue-400 to-blue-600',
-  'ultra-rare': 'from-purple-400 via-pink-500 to-yellow-500',
+  common: 'from-blue-400 to-blue-600',
+  uncommon: 'from-blue-500 to-blue-700',
+  rare: 'from-blue-600 to-blue-800',
+  'ultra-rare': 'from-blue-700 via-blue-800 to-blue-900',
 };
 
 export const PokemonCard = ({ card, className, style, showBack = false, size = 'large', onClick }: PokemonCardProps) => {
@@ -57,19 +57,8 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
 
   if (showBack) {
     return (
-      <div
-        className={cn(
-          'relative rounded-2xl overflow-hidden shadow-2xl',
-          size === 'small' ? 'w-48 h-56' : 'w-80 h-[28rem]',
-          className
-        )}
-        style={style}
-      >
-        <img
-          src={cardBackImage}
-          alt="Pokémon Card Back"
-          className="w-full h-full object-cover"
-        />
+      <div className={cn('relative rounded-2xl overflow-hidden shadow-2xl', size === 'small' ? 'w-32 h-40 sm:w-48 sm:h-56' : 'w-64 h-80 sm:w-80 sm:h-[28rem]', className)} style={style}>
+        <img src={cardBackImage} alt="Pokémon Card Back" className="w-full h-full object-cover" />
       </div>
     );
   }
@@ -87,7 +76,7 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
       className={cn(
         'relative rounded-2xl overflow-hidden shadow-2xl bg-card transform will-change-transform',
         'transition-transform',
-        size === 'small' ? 'w-48 h-56' : 'w-80 h-[28rem]',
+        size === 'small' ? 'w-32 h-40 sm:w-48 sm:h-56' : 'w-64 h-80 sm:w-80 sm:h-[28rem]',
         className
       )}
       style={{ perspective: '1000px', ...(style || {}) }}
