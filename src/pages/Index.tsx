@@ -9,7 +9,7 @@ import { PackOpening } from '@/components/PackOpening';
 import { Sparkles, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 
-type View = 'home' | 'opening' | 'viewing' | 'dashboard';
+type View = 'home' | 'opening' | 'viewing' | 'completed' | 'dashboard';
 
 const Index = () => {
   const [view, setView] = useState<View>('home');
@@ -46,7 +46,7 @@ const Index = () => {
 
   const handleViewingComplete = () => {
     setCurrentPack([]);
-    setView('dashboard');
+    setView('completed');
   };
 
   const handleRemoveFavorite = (cardId: string) => {
@@ -147,6 +147,40 @@ const Index = () => {
               onSwipe={handleSwipe}
               onComplete={handleViewingComplete}
             />
+          </div>
+        )}
+
+        {view === 'completed' && (
+          <div className="flex flex-col items-center justify-center min-h-[80vh] text-center px-4 animate-fade-in">
+            <div className="mb-8 animate-scale-in">
+              <Sparkles className="w-24 h-24 text-pokemon-yellow mx-auto mb-4 animate-pulse" />
+            </div>
+            <h2 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-pokemon-yellow to-pokemon-blue bg-clip-text text-transparent">
+              Pack Complete!
+            </h2>
+            <p className="text-xl text-muted-foreground mb-8 max-w-md">
+              You've gone through all the cards in this pack. Ready for more?
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button
+                onClick={handleOpenPack}
+                variant="hero"
+                size="lg"
+                className="text-lg px-8 py-6 h-auto"
+              >
+                <Sparkles className="mr-2 w-6 h-6" />
+                Open Another Pack
+              </Button>
+              <Button
+                onClick={() => setView('dashboard')}
+                variant="outline"
+                size="lg"
+                className="text-lg px-8 py-6 h-auto"
+              >
+                <Heart className="mr-2 w-6 h-6" />
+                Go to Dashboard
+              </Button>
+            </div>
           </div>
         )}
 
