@@ -1,19 +1,94 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { PokemonTCGCard, CardData } from '@/types/pokemon';
 
 const API_BASE = 'https://api.pokemontcg.io/v2';
+const API_TIMEOUT = 10000; // 10 seconds timeout
+
+// Custom error types for better error handling
+export class PokemonTCGError extends Error {
+  constructor(
+    message: string,
+    public code: 'TIMEOUT' | 'NETWORK' | 'API_ERROR' | 'NO_DATA' | 'UNKNOWN',
+    public originalError?: unknown
+  ) {
+    super(message);
+    this.name = 'PokemonTCGError';
+  }
+}
 
 // Get API key from window if available
 const getHeaders = () => {
   // Prefer build-time Vite env var VITE_POKEMON_API_KEY, fall back to window global for runtime injection
-  const apiKey = (import.meta as any).env?.VITE_POKEMON_API_KEY || (window as any).POKEMON_API_KEY;
+  const apiKey = (import.meta.env as Record<string, string | undefined>).VITE_POKEMON_API_KEY ||
+                 (window as unknown as Record<string, string | undefined>).POKEMON_API_KEY;
   return apiKey ? { 'X-Api-Key': apiKey } : {};
+};
+
+// Helper function to handle axios errors and convert to custom errors
+const handleApiError = (error: unknown, operation: string): never => {
+  if (axios.isAxiosError(error)) {
+    const axiosError = error as AxiosError;
+
+    if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
+      throw new PokemonTCGError(
+        'Request timed out. Please check your internet connection and try again.',
+        'TIMEOUT',
+        axiosError
+      );
+    }
+
+    if (!axiosError.response) {
+      throw new PokemonTCGError(
+        'Unable to connect to the server. Please check your internet connection.',
+        'NETWORK',
+        axiosError
+      );
+    }
+
+    const status = axiosError.response.status;
+    if (status === 429) {
+      throw new PokemonTCGError(
+        'Too many requests. Please wait a moment and try again.',
+        'API_ERROR',
+        axiosError
+      );
+    }
+
+    if (status >= 500) {
+      throw new PokemonTCGError(
+        'Server error. Please try again later.',
+        'API_ERROR',
+        axiosError
+      );
+    }
+
+    if (status === 401 || status === 403) {
+      throw new PokemonTCGError(
+        'API access denied. Please check your API key.',
+        'API_ERROR',
+        axiosError
+      );
+    }
+
+    throw new PokemonTCGError(
+      `API error (${status}). Please try again later.`,
+      'API_ERROR',
+      axiosError
+    );
+  }
+
+  throw new PokemonTCGError(
+    `Unexpected error during ${operation}. Please try again.`,
+    'UNKNOWN',
+    error
+  );
 };
 
 const getRandomSet = async () => {
   try {
     const response = await axios.get(`${API_BASE}/sets`, {
       headers: getHeaders(),
+      timeout: API_TIMEOUT,
       params: {
         pageSize: 1,
         orderBy: '-releaseDate',
@@ -24,10 +99,10 @@ const getRandomSet = async () => {
     if (sets.length > 0) {
       return sets[0];
     }
+    throw new PokemonTCGError('No sets available', 'NO_DATA');
   } catch (error) {
-    console.error('Error fetching random set:', error);
+    handleApiError(error, 'fetching random set');
   }
-  return null;
 };
 
 const normalizeRarity = (rarity: string): CardData['rarity'] => {
@@ -130,12 +205,12 @@ export const getCardsByRarity = async (rarity: string, limit: number = 10, setId
     }
     const response = await axios.get(`${API_BASE}/cards`, {
       headers: getHeaders(),
+      timeout: API_TIMEOUT,
       params,
     });
     return response.data.data || [];
   } catch (error) {
-    console.error(`Error fetching cards by rarity ${rarity}:`, error);
-    return [];
+    handleApiError(error, `fetching ${rarity} cards`);
   }
 };
 
@@ -143,7 +218,10 @@ export const getRandomPack = async (): Promise<CardData[]> => {
   try {
     // Get a random set
     const randomSet = await getRandomSet();
-    const setId = randomSet?.id;
+    if (!randomSet) {
+      throw new PokemonTCGError('Unable to find a valid card set. Please try again.', 'NO_DATA');
+    }
+    const setId = randomSet.id;
 
     // Fetch cards by rarity from the same set
     const [commonCards, uncommonCards, rareCards] = await Promise.all([
@@ -160,14 +238,25 @@ export const getRandomPack = async (): Promise<CardData[]> => {
         getCardsByRarity('Uncommon', 12),
         getCardsByRarity('Rare', 8),
       ]);
+
+      if (fallbackCommons.length < 5) {
+        throw new PokemonTCGError('Not enough cards available. Please try again later.', 'NO_DATA');
+      }
+
       return generatePack(fallbackCommons, fallbackUncommons, fallbackRares);
     }
 
     return generatePack(commonCards, uncommonCards, rareCards);
   } catch (error) {
-    console.error('Error generating random pack:', error);
-    // Return empty pack on error
-    return [];
+    if (error instanceof PokemonTCGError) {
+      throw error; // Re-throw our custom errors
+    }
+    // Handle any other unexpected errors
+    throw new PokemonTCGError(
+      'An unexpected error occurred while opening your pack. Please try again.',
+      'UNKNOWN',
+      error
+    );
   }
 };
 

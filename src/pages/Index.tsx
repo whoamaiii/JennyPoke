@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useEffect, useRef, useState } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import pokeballSvg from '@/assets/pokeball.svg';
+import { PokemonTCGError } from '@/services/pokemonTcgApi';
 
 type View = 'home' | 'opening' | 'viewing' | 'completed' | 'dashboard';
 
@@ -21,6 +22,7 @@ const Index = () => {
   const [currentPack, setCurrentPack] = useSessionStorage<CardData[]>('currentPack', []);
   const [favorites, setFavorites] = useSessionStorage<CardData[]>('favorites', []);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<PokemonTCGError | null>(null);
   const viewRootRef = useRef<HTMLDivElement | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -36,17 +38,48 @@ const Index = () => {
   const handleOpenPack = async () => {
     if (isLoading) return; // prevent multiple clicks
     setIsLoading(true);
+    setError(null); // Clear any previous errors
+
     try {
       const cards = await openPack();
+      if (cards.length === 0) {
+        throw new PokemonTCGError('No cards available. Please try again later.', 'NO_DATA');
+      }
       setCurrentPack(cards);
       setView('opening');
       toast.success('Pack opened! Swipe through your cards!');
     } catch (error) {
-      toast.error('Failed to open pack. Try again!');
-      console.error(error);
+      const pokemonError = error instanceof PokemonTCGError ? error :
+        new PokemonTCGError('An unexpected error occurred. Please try again.', 'UNKNOWN', error);
+
+      setError(pokemonError);
+
+      // Show appropriate toast message based on error type
+      switch (pokemonError.code) {
+        case 'TIMEOUT':
+          toast.error('Request timed out. Please check your connection and try again.');
+          break;
+        case 'NETWORK':
+          toast.error('Connection failed. Please check your internet and try again.');
+          break;
+        case 'API_ERROR':
+          toast.error(pokemonError.message);
+          break;
+        case 'NO_DATA':
+          toast.error('No cards available right now. Please try again later.');
+          break;
+        default:
+          toast.error('Something went wrong. Please try again.');
+      }
+
+      console.error('Pack opening error:', pokemonError);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    handleOpenPack();
   };
 
   const handleSwipe = (cardId: string, favorite: boolean) => {
@@ -144,6 +177,27 @@ const Index = () => {
                 </>
               )}
             </Button>
+
+            {error && (
+              <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg max-w-md">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 bg-destructive rounded-full"></div>
+                  <p className="text-sm font-medium text-destructive">Connection Error</p>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  {error.message}
+                </p>
+                <Button
+                  onClick={handleRetry}
+                  disabled={isLoading}
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
+                  {isLoading ? 'Retrying...' : 'Try Again'}
+                </Button>
+              </div>
+            )}
 
             {favorites.length > 0 && (
               <div className="mt-12">

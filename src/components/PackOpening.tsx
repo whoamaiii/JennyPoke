@@ -51,8 +51,8 @@ export const PackOpening = ({ onComplete }: PackOpeningProps) => {
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="relative">
+    <div className="fixed inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-50 min-h-screen">
+      <div className="relative flex items-center justify-center w-full h-full">
         {/* Pack */}
         <div
           ref={packRef}
@@ -71,7 +71,7 @@ export const PackOpening = ({ onComplete }: PackOpeningProps) => {
         {/* Cards burst effect */}
         <div
           ref={cardsRef}
-          className="absolute inset-0 flex items-center justify-center opacity-0 scale-0"
+          className="absolute inset-0 flex items-center justify-center opacity-0 scale-0 pointer-events-none"
         >
           <div className="relative">
             {[...Array(8)].map((_, i) => (

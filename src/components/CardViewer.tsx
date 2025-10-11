@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Hammer from 'hammerjs';
 import gsap from 'gsap';
 import { CardData } from '@/types/pokemon';
@@ -15,6 +15,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set()); // Start with all cards flipped (showing back)
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isFlipping, setIsFlipping] = useState(false); // Prevent multiple clicks during flip
   const cardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const heartRef = useRef<HTMLDivElement>(null);
@@ -79,8 +80,8 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     }
   };
 
-  const swipeCard = (direction: 'left' | 'right') => {
-    if (isAnimating || !cardRef.current || !currentCard) return;
+  const swipeCard = useCallback((direction: 'left' | 'right') => {
+    if (isAnimating || isFlipped || !cardRef.current || !currentCard) return;
     
     setIsAnimating(true);
     const isFavorite = direction === 'left';
@@ -121,11 +122,12 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         }
       },
     });
-  };
+  }, [isAnimating, isFlipped, currentCard, currentIndex, cards.length, onSwipe, onComplete]);
 
-  const toggleFlip = () => {
-    if (isAnimating) return;
-    
+  const toggleFlip = useCallback(() => {
+    if (isAnimating || isFlipping) return;
+
+    setIsFlipping(true);
     setFlippedCards(prev => {
       const newSet = new Set(prev);
       if (newSet.has(currentIndex)) {
@@ -138,12 +140,13 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
     if (cardRef.current) {
       gsap.to(cardRef.current, {
-        rotationY: isFlipped ? 180 : 0, // Flip from 0 to 180 when unflipping (showing front), from 180 to 0 when flipping (showing back)
+        rotationY: isFlipped ? 0 : 180, // Flip to 180 when showing back, to 0 when showing front
         duration: 0.6,
         ease: 'power2.inOut',
+        onComplete: () => setIsFlipping(false),
       });
     }
-  };
+  }, [isAnimating, isFlipping, currentIndex, isFlipped]);
 
   // Hammer.js setup
   useEffect(() => {
@@ -153,7 +156,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     hammer.get('pan').set({ direction: Hammer.DIRECTION_ALL, threshold: 10 });
 
     hammer.on('panmove', (e) => {
-      if (isAnimating || !cardRef.current) return;
+      if (isAnimating || isFlipped || !cardRef.current) return;
 
       const deltaX = e.deltaX;
       const deltaY = e.deltaY;
@@ -167,7 +170,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     });
 
     hammer.on('panend', (e) => {
-      if (isAnimating || !cardRef.current) return;
+      if (isAnimating || isFlipped || !cardRef.current) return;
 
       const deltaX = e.deltaX;
       const velocityX = e.velocityX;
@@ -194,7 +197,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     return () => {
       hammer.destroy();
     };
-  }, [currentIndex, isAnimating, cards.length, currentCard]);
+  }, [currentIndex, isAnimating, cards.length, currentCard, swipeCard, isFlipped]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -219,7 +222,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, isAnimating, isFlipped]);
+  }, [currentIndex, isAnimating, isFlipped, swipeCard, toggleFlip]);
 
   // Card enter animation
   useEffect(() => {
@@ -248,9 +251,9 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   return (
     <div ref={containerRef} className="relative w-full h-screen flex items-center justify-center overflow-hidden">
       {/* Card stack background */}
-      <div className="absolute">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         {currentIndex < cards.length - 1 && (
-          <div className="opacity-30 scale-95 blur-sm">
+          <div className="opacity-30 scale-95 blur-sm transform translate-y-2">
             <PokemonCard card={cards[currentIndex + 1]} showBack />
           </div>
         )}
@@ -267,7 +270,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         onClick={toggleFlip}
       >
         <div style={{ backfaceVisibility: 'hidden' }}>
-          <PokemonCard card={currentCard} showBack={!isFlipped} />
+          <PokemonCard card={currentCard} showBack={isFlipped} />
         </div>
       </div>
 
