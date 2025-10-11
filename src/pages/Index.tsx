@@ -27,6 +27,7 @@ const Index = () => {
   const [error, setError] = useState<PokemonTCGError | null>(null);
   const viewRootRef = useRef<HTMLDivElement | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [isTestingApi, setIsTestingApi] = useState(false);
 
   useEffect(() => {
     if (!viewRootRef.current) return;
@@ -38,7 +39,7 @@ const Index = () => {
   }, [view]);
 
   const handleOpenPack = async () => {
-    if (isLoading) return; // prevent multiple clicks
+    if (isLoading || isTestingApi) return; // prevent multiple clicks and simultaneous operations
     setIsLoading(true);
     setError(null); // Clear any previous errors
 
@@ -171,7 +172,7 @@ const Index = () => {
             
             <Button
               onClick={handleOpenPack}
-              disabled={isLoading}
+              disabled={isLoading || isTestingApi}
               variant="hero"
               size="lg"
               className="text-lg px-8 py-6"
@@ -191,29 +192,42 @@ const Index = () => {
 
             <Button
               onClick={async () => {
-                console.log('🧪 Testing API key...');
-                const success = await testApiKey();
-                if (success) {
-                  toast.success('API key is working! Check console for details.');
-                } else {
-                  toast.error('API key test failed. Check console for details.');
+                if (isTestingApi || isLoading) return; // prevent multiple clicks and simultaneous operations
+                setIsTestingApi(true);
+                try {
+                  const success = await testApiKey();
+                  if (success) {
+                    toast.success('API key is working correctly!');
+                  } else {
+                    toast.error('API key test failed. Please check your configuration.');
+                  }
+                } catch (error) {
+                  toast.error('API key test failed. Please check your configuration.');
+                } finally {
+                  setIsTestingApi(false);
                 }
               }}
+              disabled={isTestingApi || isLoading}
               variant="outline"
               size="sm"
               className="mt-4 text-sm"
             >
-              Test API Key
+              {isTestingApi ? 'Testing...' : 'Test API Key'}
             </Button>
 
-            {isLoading && (
+            {(isLoading || isTestingApi) && (
               <div className="mt-4 p-4 bg-card/50 backdrop-blur border border-border/50 rounded-lg max-w-md">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                  <p className="text-sm font-medium">Fetching cards from API...</p>
+                  <p className="text-sm font-medium">
+                    {isLoading ? 'Fetching cards from API...' : 'Testing API key...'}
+                  </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  This may take up to 5 minutes due to API response times. Please wait...
+                  {isLoading 
+                    ? 'This may take up to 5 minutes due to API response times. Please wait...'
+                    : 'Checking API key configuration...'
+                  }
                 </p>
               </div>
             )}
@@ -229,7 +243,7 @@ const Index = () => {
                 </p>
                 <Button
                   onClick={handleRetry}
-                  disabled={isLoading}
+                  disabled={isLoading || isTestingApi}
                   variant="outline"
                   size="sm"
                   className="w-full"

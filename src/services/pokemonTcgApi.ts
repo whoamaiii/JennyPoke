@@ -69,9 +69,7 @@ const getHeaders = () => {
   // Prefer build-time Vite env var VITE_POKEMON_API_KEY, fall back to window global for runtime injection
   const apiKey = (import.meta.env as Record<string, string | undefined>).VITE_POKEMON_API_KEY ||
                  (window as unknown as Record<string, string | undefined>).POKEMON_API_KEY;
-  const headers = apiKey ? { 'X-Api-Key': apiKey } : {};
-  console.log('🔑 API Key check:', apiKey ? `Present (${apiKey.substring(0, 8)}...)` : 'Not found');
-  return headers;
+  return apiKey ? { 'X-Api-Key': apiKey } : {};
 };
 
 // Get headers without API key (for fallback)
@@ -90,11 +88,9 @@ const makeApiRequest = async (config: {
 
   // First try with API key
   try {
-    const headersWithKey = { ...config.headers, ...getHeaders() };
-    console.log('📤 Request headers:', Object.keys(headersWithKey).join(', '));
     const response = await axios({
       ...config,
-      headers: headersWithKey,
+      headers: { ...config.headers, ...getHeaders() },
       timeout: API_TIMEOUT,
     });
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -105,11 +101,9 @@ const makeApiRequest = async (config: {
     if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
       console.log('🔑 API key failed, trying without API key...');
       try {
-        const headersWithoutKey = { ...config.headers, ...getHeadersWithoutApiKey() };
-        console.log('📤 Fallback request headers:', Object.keys(headersWithoutKey).join(', ') || 'none');
         const response = await axios({
           ...config,
-          headers: headersWithoutKey,
+          headers: { ...config.headers, ...getHeadersWithoutApiKey() },
           timeout: API_TIMEOUT,
         });
         const duration = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -414,13 +408,10 @@ export const openPack = getRandomPack;
 
 // Temporary test function to verify API key
 export const testApiKey = async () => {
-  console.log('🧪 Testing API key functionality...');
   try {
-    const randomSet = await getRandomSet();
-    console.log('✅ API key test successful! Retrieved set:', randomSet.name);
+    await getRandomSet();
     return true;
   } catch (error) {
-    console.error('❌ API key test failed:', error);
     return false;
   }
 };
