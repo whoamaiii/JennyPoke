@@ -250,7 +250,7 @@ const Index = () => {
                 <div className="mt-4 p-4 bg-card/50 backdrop-blur border border-border/50 rounded-lg max-w-md">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                    <p className="text-sm font-medium">
+                    <p className="text-sm text-center font-medium">
                       {isLoading ? 'Fetching cards from API...' : 'Testing API key...'}
                     </p>
                   </div>
