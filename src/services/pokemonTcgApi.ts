@@ -75,9 +75,8 @@ export class PokemonTCGError extends Error {
 
 // Get API key from window if available
 const getHeaders = () => {
-  // Prefer build-time Vite env var VITE_POKEMON_API_KEY, fall back to window global for runtime injection
-  const apiKey = (import.meta.env as Record<string, string | undefined>).VITE_POKEMON_API_KEY ||
-                 (window as unknown as Record<string, string | undefined>).POKEMON_API_KEY;
+  // API key is a publishable key and safe to store in code
+  const apiKey = '4c234358-ff65-4a99-9d97-84bf974ebd2b';
   return apiKey ? { 'X-Api-Key': apiKey } : {};
 };
 

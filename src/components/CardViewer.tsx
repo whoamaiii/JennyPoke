@@ -13,16 +13,13 @@ interface CardViewerProps {
 
 export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set()); // Start with all cards flipped (showing back)
   const [isAnimating, setIsAnimating] = useState(false);
-  const [isFlipping, setIsFlipping] = useState(false); // Prevent multiple clicks during flip
   const cardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const heartRef = useRef<HTMLDivElement>(null);
   const skipRef = useRef<HTMLDivElement>(null);
 
   const currentCard = cards[currentIndex];
-  const isFlipped = flippedCards.has(currentIndex); // This will be false initially (showing back)
 
   const animateHeart = () => {
     if (heartRef.current) {
@@ -81,7 +78,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   };
 
   const swipeCard = useCallback((direction: 'left' | 'right') => {
-    if (isAnimating || isFlipped || !cardRef.current || !currentCard) return;
+    if (isAnimating || !cardRef.current || !currentCard) return;
     
     setIsAnimating(true);
     const isFavorite = direction === 'left';
@@ -122,31 +119,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         }
       },
     });
-  }, [isAnimating, isFlipped, currentCard, currentIndex, cards.length, onSwipe, onComplete]);
-
-  const toggleFlip = useCallback(() => {
-    if (isAnimating || isFlipping) return;
-
-    setIsFlipping(true);
-    setFlippedCards(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(currentIndex)) {
-        newSet.delete(currentIndex);
-      } else {
-        newSet.add(currentIndex);
-      }
-      return newSet;
-    });
-
-    if (cardRef.current) {
-      gsap.to(cardRef.current, {
-        rotationY: isFlipped ? 0 : 180, // Flip to 180 when showing back, to 0 when showing front
-        duration: 0.6,
-        ease: 'power2.inOut',
-        onComplete: () => setIsFlipping(false),
-      });
-    }
-  }, [isAnimating, isFlipping, currentIndex, isFlipped]);
+  }, [isAnimating, currentCard, currentIndex, cards.length, onSwipe, onComplete]);
 
   // Hammer.js setup
   useEffect(() => {
@@ -156,7 +129,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     hammer.get('pan').set({ direction: Hammer.DIRECTION_ALL, threshold: 10 });
 
     hammer.on('panmove', (e) => {
-      if (isAnimating || isFlipped || !cardRef.current) return;
+      if (isAnimating || !cardRef.current) return;
 
       const deltaX = e.deltaX;
       const deltaY = e.deltaY;
@@ -170,7 +143,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     });
 
     hammer.on('panend', (e) => {
-      if (isAnimating || isFlipped || !cardRef.current) return;
+      if (isAnimating || !cardRef.current) return;
 
       const deltaX = e.deltaX;
       const velocityX = e.velocityX;
@@ -197,7 +170,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     return () => {
       hammer.destroy();
     };
-  }, [currentIndex, isAnimating, cards.length, currentCard, swipeCard, isFlipped]);
+  }, [currentIndex, isAnimating, cards.length, currentCard, swipeCard]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -213,16 +186,12 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           e.preventDefault();
           swipeCard('right');
           break;
-        case ' ':
-          e.preventDefault();
-          toggleFlip();
-          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, isAnimating, isFlipped, swipeCard, toggleFlip]);
+  }, [currentIndex, isAnimating, swipeCard]);
 
   // Card enter animation
   useEffect(() => {
@@ -262,15 +231,14 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
       {/* Current card */}
       <div
         ref={cardRef}
-        className="relative cursor-pointer"
+        className="relative"
         style={{
           perspective: '1000px',
           transformStyle: 'preserve-3d',
         }}
-        onClick={toggleFlip}
       >
         <div style={{ backfaceVisibility: 'hidden' }}>
-          <PokemonCard card={currentCard} showBack={isFlipped} />
+          <PokemonCard card={currentCard} showBack={false} />
         </div>
       </div>
 
@@ -304,9 +272,6 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
             <span>Skip</span>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground bg-card/80 backdrop-blur px-4 py-2 rounded-full">
-          Click card to flip • Press SPACE to flip
-        </p>
       </div>
 
       {/* Counter */}

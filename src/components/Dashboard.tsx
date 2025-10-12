@@ -76,9 +76,6 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
               <Trash className="w-3 h-3" />
               Clear Session
             </Button>
-            <Button onClick={onBackToHome} variant="outline" size="sm" className="text-xs">
-              Back to Home
-            </Button>
           </div>
         </div>
 

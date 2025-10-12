@@ -179,10 +179,10 @@ const Index = () => {
             >
               Collection ({favorites.length})
             </Button>
-            <ThemeToggle />
             <Button variant="ghost" onClick={() => setHelpOpen(true)}>
               Help
             </Button>
+            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -373,10 +373,9 @@ const Index = () => {
             </DialogHeader>
             <DialogDescription>
               <ul className="list-disc ml-6">
-                <li>Click card to flip and reveal</li>
-                <li>Swipe → Next</li>
-                <li>Swipe ← Favourite</li>
-                <li>Press SPACE to flip card</li>
+                <li>Swipe right (→) to skip</li>
+                <li>Swipe left (←) to add to favorites</li>
+                <li>Press Arrow keys for keyboard navigation</li>
               </ul>
             </DialogDescription>
             <DialogFooter>
