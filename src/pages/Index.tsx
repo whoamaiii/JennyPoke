@@ -191,160 +191,163 @@ const Index = () => {
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         {/* view transition wrapper */}
         <div id="view-root" ref={viewRootRef} className="w-full max-w-4xl">
-        {view === 'home' && (
-          <div className="flex flex-col items-center justify-center min-h-[80vh] text-center">
-            <div className="mb-8">
+          {view === 'home' && (
+            <div className="flex flex-col items-center justify-center min-h-[80vh] text-center">
+              <div className="mb-8">
                 <img src={pokeballSvg} alt="Pokéball" className="w-28 h-28 mb-4 mx-auto" />
               </div>
-            
-            <h2 className="text-4xl md:text-5xl font-bold mb-8 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-              Open Your Pokémon Pack
-            </h2>
-            
-            <Button
-              onClick={handleOpenPack}
-              disabled={isLoading || isTestingApi}
-              variant="hero"
-              size="lg"
-              className="text-lg px-8 py-6"
-            >
-              {isLoading ? (
-                <>
-                  <Sparkles className="w-5 h-5 animate-spin" />
-                  Opening Pack...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-5 h-5" />
-                  Open Pack
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={async () => {
-                if (isTestingApi || isLoading) return; // prevent multiple clicks and simultaneous operations
-                setIsTestingApi(true);
-                try {
-                  const success = await testApiKey();
-                  if (success) {
-                    toast.success('API key is working correctly!');
-                  } else {
-                    toast.error('API key test failed. Please check your configuration.');
-                  }
-                } catch (error) {
-                  toast.error('API key test failed. Please check your configuration.');
-                } finally {
-                  setIsTestingApi(false);
-                }
-              }}
-              disabled={isTestingApi || isLoading}
-              variant="outline"
-              size="sm"
-              className="mt-4 text-sm"
-            >
-              {isTestingApi ? 'Testing...' : 'Test API Key'}
-            </Button>
-
-            {(isLoading || isTestingApi) && (
-              <div className="mt-4 p-4 bg-card/50 backdrop-blur border border-border/50 rounded-lg max-w-md">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                  <p className="text-sm font-medium">
-                    {isLoading ? 'Fetching cards from API...' : 'Testing API key...'}
-                  </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {isLoading 
-                    ? 'This may take up to 7 minutes due to API response times. Please wait...'
-                    : 'Checking API key configuration...'
-                  }
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg max-w-md">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 bg-destructive rounded-full"></div>
-                  <p className="text-sm font-medium text-destructive">Connection Error</p>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  {error.message}
-                </p>
-                <Button
-                  onClick={handleRetry}
-                  disabled={isLoading || isTestingApi}
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                >
-                  {isLoading ? 'Retrying...' : 'Try Again'}
-                </Button>
-              </div>
-            )}
-
-        {view === 'opening' && (
-          <PackOpening onComplete={() => setView('viewing')} />
-        )}
-
-        {view === 'viewing' && currentPack.length > 0 && (
-          <div className="w-full">
-            <CardViewer
-              cards={currentPack}
-              onSwipe={handleSwipe}
-              onComplete={handleViewingComplete}
-            />
-          </div>
-        )}
-
-        {view === 'completed' && (
-          <div className="flex flex-col items-center justify-center min-h-[80vh] text-center px-4 animate-fade-in">
-            <div className="mb-8 animate-scale-in">
-              <Sparkles className="w-24 h-24 text-pokemon-yellow mx-auto mb-4 animate-pulse" />
-            </div>
-            <h2 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-pokemon-yellow to-pokemon-blue bg-clip-text text-transparent">
-              Pack Complete!
-            </h2>
-            <p className="text-xl text-muted-foreground mb-8 max-w-md">
-              You've gone through all the cards in this pack. Ready for more?
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
+              
+              <h2 className="text-4xl md:text-5xl font-bold mb-8 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                Open Your Pokémon Pack
+              </h2>
+              
               <Button
                 onClick={handleOpenPack}
+                disabled={isLoading || isTestingApi}
                 variant="hero"
                 size="lg"
-                className="text-lg px-8 py-6 h-auto"
+                className="text-lg px-8 py-6"
               >
-                <Sparkles className="mr-2 w-6 h-6" />
-                Open Another Pack
+                {isLoading ? (
+                  <>
+                    <Sparkles className="w-5 h-5 animate-spin" />
+                    Opening Pack...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    Open Pack
+                  </>
+                )}
               </Button>
-              <Button
-                onClick={() => setView('dashboard')}
-                variant="outline"
-                size="lg"
-                className="text-lg px-8 py-6 h-auto"
-              >
-                <Heart className="mr-2 w-6 h-6" />
-                Go to Dashboard
-              </Button>
-            </div>
-          </div>
-        )}
 
-        {view === 'dashboard' && (
-          <Suspense fallback={
-            <div className="min-h-screen flex items-center justify-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+              <Button
+                onClick={async () => {
+                  if (isTestingApi || isLoading) return; // prevent multiple clicks and simultaneous operations
+                  setIsTestingApi(true);
+                  try {
+                    const success = await testApiKey();
+                    if (success) {
+                      toast.success('API key is working correctly!');
+                    } else {
+                      toast.error('API key test failed. Please check your configuration.');
+                    }
+                  } catch (error) {
+                    toast.error('API key test failed. Please check your configuration.');
+                  } finally {
+                    setIsTestingApi(false);
+                  }
+                }}
+                disabled={isTestingApi || isLoading}
+                variant="outline"
+                size="sm"
+                className="mt-4 text-sm"
+              >
+                {isTestingApi ? 'Testing...' : 'Test API Key'}
+              </Button>
+
+              {(isLoading || isTestingApi) && (
+                <div className="mt-4 p-4 bg-card/50 backdrop-blur border border-border/50 rounded-lg max-w-md">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                    <p className="text-sm font-medium">
+                      {isLoading ? 'Fetching cards from API...' : 'Testing API key...'}
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {isLoading 
+                      ? 'This may take up to 7 minutes due to API response times. Please wait...'
+                      : 'Checking API key configuration...'
+                    }
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg max-w-md">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-destructive rounded-full"></div>
+                    <p className="text-sm font-medium text-destructive">Connection Error</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {error.message}
+                  </p>
+                  <Button
+                    onClick={handleRetry}
+                    disabled={isLoading || isTestingApi}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    {isLoading ? 'Retrying...' : 'Try Again'}
+                  </Button>
+                </div>
+              )}
             </div>
-          }>
-            <Dashboard
-              favorites={favorites}
-              onRemoveFavorite={handleRemoveFavorite}
-              onBackToHome={() => setView('home')}
-            />
-          </Suspense>
-        )}
+          )}
+
+          {view === 'opening' && (
+            <PackOpening onComplete={() => setView('viewing')} />
+          )}
+
+          {view === 'viewing' && currentPack.length > 0 && (
+            <div className="w-full">
+              <CardViewer
+                cards={currentPack}
+                onSwipe={handleSwipe}
+                onComplete={handleViewingComplete}
+              />
+            </div>
+          )}
+
+          {view === 'completed' && (
+            <div className="flex flex-col items-center justify-center min-h-[80vh] text-center px-4 animate-fade-in">
+              <div className="mb-8 animate-scale-in">
+                <Sparkles className="w-24 h-24 text-pokemon-yellow mx-auto mb-4 animate-pulse" />
+              </div>
+              <h2 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-pokemon-yellow to-pokemon-blue bg-clip-text text-transparent">
+                Pack Complete!
+              </h2>
+              <p className="text-xl text-muted-foreground mb-8 max-w-md">
+                You've gone through all the cards in this pack. Ready for more?
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button
+                  onClick={handleOpenPack}
+                  variant="hero"
+                  size="lg"
+                  className="text-lg px-8 py-6 h-auto"
+                >
+                  <Sparkles className="mr-2 w-6 h-6" />
+                  Open Another Pack
+                </Button>
+                <Button
+                  onClick={() => setView('dashboard')}
+                  variant="outline"
+                  size="lg"
+                  className="text-lg px-8 py-6 h-auto"
+                >
+                  <Heart className="mr-2 w-6 h-6" />
+                  Go to Dashboard
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {view === 'dashboard' && (
+            <Suspense fallback={
+              <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+              </div>
+            }>
+              <Dashboard
+                favorites={favorites}
+                onRemoveFavorite={handleRemoveFavorite}
+                onBackToHome={() => setView('home')}
+              />
+            </Suspense>
+          )}
+        </div>
         
         {/* Help modal (controlled) */}
         <Dialog open={helpOpen} onOpenChange={(isOpen) => setHelpOpen(isOpen)}>
