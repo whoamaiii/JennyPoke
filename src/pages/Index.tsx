@@ -161,7 +161,7 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <img src={pokeballSvg} alt="Pokéball" className="w-6 h-6" />
-            <h1 className="text-2xl font-bold">Pokémon Pack Opener</h1>
+            <h1 className="text-2xl font-bold hidden lg:block">Pokémon Pack Opener</h1>
           </div>
           
           <div className="flex gap-2">
@@ -197,13 +197,9 @@ const Index = () => {
                 <img src={pokeballSvg} alt="Pokéball" className="w-28 h-28 mb-4 mx-auto" />
               </div>
             
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+            <h2 className="text-4xl md:text-5xl font-bold mb-8 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
               Open Your Pokémon Pack
             </h2>
-            
-            <p className="text-xl text-muted-foreground mb-8 max-w-md">
-              Discover 8 random Pokémon cards. Swipe right to save your favorites!
-            </p>
             
             <Button
               onClick={handleOpenPack}
