@@ -58,7 +58,7 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
   if (showBack) {
     return (
       <div className={cn('relative rounded-2xl overflow-hidden shadow-2xl', size === 'small' ? 'w-32 h-40 sm:w-48 sm:h-56' : 'w-64 h-80 sm:w-80 sm:h-[28rem]', className)} style={style}>
-        <img src={cardBackImage} alt="Pokémon Card Back" className="w-full h-full object-cover" />
+        <img src={cardBackImage} alt="Pokémon Card Back" className="w-full h-full object-contain" />
       </div>
     );
   }
@@ -89,7 +89,7 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
             <img
               src={imgSmall}
               aria-hidden
-              className={cn('absolute inset-0 w-full h-full object-cover transition-opacity duration-500', loaded ? 'opacity-0' : 'opacity-100')}
+              className={cn('absolute inset-0 w-full h-full object-contain transition-opacity duration-500', loaded ? 'opacity-0' : 'opacity-100')}
             />
           )}
 
@@ -98,7 +98,7 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
             alt={tcgCard.name}
             loading="lazy"
             onLoad={() => setLoaded(true)}
-            className={cn('relative w-full h-full object-cover transition-filter duration-500', loaded ? 'filter-none' : 'blur-sm')}
+            className={cn('relative w-full h-full object-contain transition-filter duration-500', loaded ? 'filter-none' : 'blur-sm')}
           />
         </div>
       </div>
