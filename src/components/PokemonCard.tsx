@@ -9,7 +9,8 @@ interface PokemonCardProps {
   className?: string;
   style?: React.CSSProperties;
   showBack?: boolean;
-  size?: 'small' | 'large';
+  // The 'size' prop is no longer needed.
+  // size?: 'small' | 'large'; 
   onClick?: () => void;
 }
 
@@ -20,7 +21,8 @@ const rarityColors: Record<string, string> = {
   'ultra-rare': 'from-blue-700 via-blue-800 to-blue-900',
 };
 
-export const PokemonCard = ({ card, className, style, showBack = false, size = 'large', onClick }: PokemonCardProps) => {
+// 1. Remove 'size' from the function signature.
+export const PokemonCard = ({ card, className, style, showBack = false, onClick }: PokemonCardProps) => {
   const { card: tcgCard, rarity } = card;
 
   const elRef = useRef<HTMLDivElement | null>(null);
@@ -57,7 +59,8 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
 
   if (showBack) {
     return (
-      <div className={cn('relative rounded-2xl overflow-hidden shadow-2xl', size === 'small' ? 'w-32 h-40 sm:w-48 sm:h-56' : 'w-64 h-80 sm:w-80 sm:h-[28rem]', className)} style={style}>
+      // 2. Hardcode the 'large' size classes here.
+      <div className={cn('relative rounded-2xl overflow-hidden shadow-2xl w-64 h-80 sm:w-80 sm:h-[28rem]', className)} style={style}>
         <img src={cardBackImage} alt="Pokémon Card Back" className="w-full h-full object-cover" />
       </div>
     );
@@ -65,7 +68,8 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
 
   const imgSmall = tcgCard.images.small;
   const imgLarge = tcgCard.images.large || imgSmall;
-  const imgSrc = size === 'small' ? imgSmall || imgLarge : imgLarge;
+  // 3. Simplify image source logic to always use the large image.
+  const imgSrc = imgLarge;
 
   return (
     <div
@@ -76,31 +80,28 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
       className={cn(
         'relative rounded-2xl overflow-hidden shadow-2xl bg-card transform will-change-transform',
         'transition-transform',
-        size === 'small' ? 'w-32 h-40 sm:w-48 sm:h-56' : 'w-64 h-80 sm:w-80 sm:h-[28rem]',
+        // 2. Hardcode the 'large' size classes here as well.
+        'w-64 h-80 sm:w-80 sm:h-[28rem]',
         className
       )}
       style={{ perspective: '1000px', ...(style || {}) }}
     >
-
-        <div className="w-full h-full rounded-xl bg-card overflow-hidden relative">
-          {/* low-res placeholder underneath (blurred) */}
-          {imgSmall && imgLarge && imgSmall !== imgLarge && (
-            <img
-              src={imgSmall}
-              aria-hidden
-              className={cn('absolute inset-0 w-full h-full object-cover transition-opacity duration-500', loaded ? 'opacity-0' : 'opacity-100')}
-            />
-          )}
-
+      <div className="w-full h-full rounded-xl bg-card overflow-hidden relative">
+        {imgSmall && imgLarge && imgSmall !== imgLarge && (
           <img
-            src={imgSrc}
-            alt={tcgCard.name}
-            loading="lazy"
-            onLoad={() => setLoaded(true)}
-            className={cn('relative w-full h-full object-cover transition-filter duration-500', loaded ? 'filter-none' : 'blur-sm')}
+            src={imgSmall}
+            aria-hidden
+            className={cn('absolute inset-0 w-full h-full object-cover transition-opacity duration-500', loaded ? 'opacity-0' : 'opacity-100')}
           />
-        </div>
-
+        )}
+        <img
+          src={imgSrc}
+          alt={tcgCard.name}
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+          className={cn('relative w-full h-full object-cover transition-filter duration-500', loaded ? 'filter-none' : 'blur-sm')}
+        />
+      </div>
     </div>
   );
 };
