@@ -177,7 +177,7 @@ const Index = () => {
               onClick={() => setView('dashboard')}
               disabled={view === 'dashboard'}
             >
-              Collection ({favorites.length})
+              Faves ({favorites.length})
             </Button>
             <Button variant="ghost" onClick={() => setHelpOpen(true)}>
               Help
