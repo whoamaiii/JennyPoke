@@ -27,8 +27,8 @@ const rarityColors: Record<string, string> = {
 const getSizeClasses = (size: CardSize) => {
   switch (size) {
     case 'grid':
-      // Matches the Dashboard's max-w-[245px] and uses an aspect ratio
-      return 'w-[245px] h-[335px]'; // Approximate height for card aspect ratio (245 * 1.367)
+      // CUSTOM SIZE: Fixed dimensions for the new desired size
+      return 'w-[245px] h-[335px]';
     case 'small':
       return 'w-32 h-40 sm:w-48 sm:h-56';
     case 'large':
@@ -41,9 +41,10 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
   const { card: tcgCard, rarity } = card;
   const elRef = useRef<HTMLDivElement | null>(null);
   const [loaded, setLoaded] = useState(false);
-  
-  // Determine if the interactive effect should be enabled
-  const isInteractive = size !== 'grid' && !showBack;
+  
+  // UPDATED LOGIC: Interactive effect is enabled for 'grid' and 'large' sizes.
+  // It is only disabled for 'small' and when the card back is showing.
+  const isInteractive = size !== 'small' && !showBack;
 
   useEffect(() => {
     if (!isInteractive) return;
@@ -86,8 +87,10 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
 
   const imgSmall = tcgCard.images.small;
   const imgLarge = tcgCard.images.large || imgSmall;
-  // Use the small image for 'small' or 'grid' sizes to save bandwidth
-  const imgSrc = (size === 'small' || size === 'grid') ? imgSmall || imgLarge : imgLarge;
+  
+  // UPDATED LOGIC: Only use small image for 'small' size.
+  // 'grid' and 'large' now prioritize the large image for high quality.
+  const imgSrc = (size === 'small') ? imgSmall || imgLarge : imgLarge;
 
   return (
     <div
@@ -104,8 +107,8 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
       style={{ perspective: '1000px', ...(style || {}) }}
     >
       <div className="w-full h-full rounded-xl bg-card overflow-hidden relative">
-        {/* low-res placeholder underneath (blurred) - only useful if large is used */}
-        {imgSmall && imgLarge && imgSmall !== imgLarge && size === 'large' && (
+        {/* low-res placeholder underneath (blurred) - Now enabled for 'grid' and 'large' */}
+        {imgSmall && imgLarge && imgSmall !== imgLarge && size !== 'small' && (
           <img
             src={imgSmall}
             aria-hidden
