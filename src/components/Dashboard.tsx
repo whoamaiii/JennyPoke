@@ -74,7 +74,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
             </Button>
             <Button onClick={handleClearSession} variant="destructive" size="sm" className="flex items-center gap-1 text-xs">
               <Trash className="w-3 h-3" />
-              Clear Session
+              Remove All
             </Button>
           </div>
         </div>
