@@ -81,8 +81,7 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
       )}
       style={{ perspective: '1000px', ...(style || {}) }}
     >
-      {/* Rarity border */}
-      <div className={cn('absolute inset-0 p-1 rounded-2xl bg-gradient-to-br', rarityColors[rarity])}>
+
         <div className="w-full h-full rounded-xl bg-card overflow-hidden relative">
           {/* low-res placeholder underneath (blurred) */}
           {imgSmall && imgLarge && imgSmall !== imgLarge && (
@@ -101,7 +100,7 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
             className={cn('relative w-full h-full object-cover transition-filter duration-500', loaded ? 'filter-none' : 'blur-sm')}
           />
         </div>
-      </div>
+
     </div>
   );
 };
