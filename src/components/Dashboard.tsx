@@ -87,20 +87,24 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {favorites.map((card) => (
               <div key={card.id} className="flex flex-col items-center">
-                <div className="transition-transform hover:scale-105">
-                  <PokemonCard card={card} size="small" onClick={() => setSelected(card)} />
+                <div className="transition-transform hover:scale-105 cursor-pointer" onClick={() => setSelected(card)}>
+                  <img 
+                    src={card.card.images.small || card.card.images.large}
+                    alt={card.card.name}
+                    className="w-full max-w-[245px] h-auto object-contain rounded-lg shadow-lg"
+                  />
                 </div>
-                <div className="mt-2 text-center w-full">
-                  <p className="font-semibold">{card.card.name}</p>
-                  <p className="text-sm text-muted-foreground">{card.card.set.name}</p>
+                <div className="mt-4 text-center w-full max-w-[245px]">
+                  <p className="font-semibold text-lg">{card.card.name}</p>
+                  <p className="text-sm text-muted-foreground mb-3">{card.card.set.name}</p>
                   <Button
                     onClick={() => onRemoveFavorite(card.id)}
                     variant="destructive"
                     size="sm"
-                    className="mt-2 w-full"
+                    className="w-full"
                   >
                     Remove
                   </Button>
