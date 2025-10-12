@@ -291,7 +291,7 @@ const Index = () => {
                   onClick={() => setView('dashboard')}
                   className="text-sm"
                 >
-                  View Collection ({favorites.length} cards)
+                  View Faves ({favorites.length} cards)
                 </Button>
               </div>
             )}
