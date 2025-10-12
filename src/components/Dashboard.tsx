@@ -65,7 +65,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold flex items-center gap-3">
             <Heart className="w-10 h-10 text-pokemon-red fill-pokemon-red" />
-            Your Collection
+            Favourites
           </h1>
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={handleExport} variant="outline" size="sm" className="flex items-center gap-1 text-xs">
@@ -87,7 +87,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-3 gap-6">
             {favorites.map((card) => (
               <div key={card.id} className="flex flex-col items-center">
                 <div className="transition-transform hover:scale-105 cursor-pointer" onClick={() => setSelected(card)}>
@@ -124,11 +124,12 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex justify-center">
+                {/* <div className="w-48 h-56"> */}
                 <div className="w-48 h-56">
                   <img 
                     src={selected.card.images.small || selected.card.images.large} 
                     alt={selected.card.name} 
-                    className="w-full h-full object-cover rounded-md" 
+                    className="w-full max-w-[245px] h-auto object-contain rounded-lg shadow-lg" 
                   />
                 </div>
               </div>
