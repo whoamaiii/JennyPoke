@@ -345,7 +345,7 @@ const Index = () => {
             />
           </Suspense>
         )}
-
+        
         {/* Help modal (controlled) */}
         <Dialog open={helpOpen} onOpenChange={(isOpen) => setHelpOpen(isOpen)}>
           <DialogContent>
