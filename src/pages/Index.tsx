@@ -284,20 +284,6 @@ const Index = () => {
               </div>
             )}
 
-            {favorites.length > 0 && (
-              <div className="mt-12">
-                <Button
-                  variant="outline"
-                  onClick={() => setView('dashboard')}
-                  className="text-sm"
-                >
-                  View Faves ({favorites.length} cards)
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
         {view === 'opening' && (
           <PackOpening onComplete={() => setView('viewing')} />
         )}
