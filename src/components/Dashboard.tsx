@@ -65,7 +65,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold flex items-center gap-3">
             <Heart className="w-10 h-10 text-pokemon-red fill-pokemon-red" />
-            Favourites
+            Faves
           </h1>
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={handleExport} variant="outline" size="sm" className="flex items-center gap-1 text-xs">
