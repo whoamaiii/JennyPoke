@@ -487,9 +487,9 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center px-4 py-8 min-h-0">
+      <main className={`flex-1 ${view === 'dashboard' ? 'overflow-hidden' : 'flex items-center justify-center px-4 py-8'} min-h-0`}>
         {/* view transition wrapper */}
-        <div id="view-root" ref={viewRootRef} className="w-full max-w-4xl flex items-center justify-center">
+        <div id="view-root" ref={viewRootRef} className={`w-full ${view === 'dashboard' ? 'h-full' : 'max-w-4xl flex items-center justify-center'}`}>
           {view === 'home' && (
             <div className="flex flex-col items-center justify-center h-full text-center w-full">
               <div className="mb-8">
@@ -525,10 +525,6 @@ const Index = () => {
                   </>
                 )}
               </Button>
-
-
-
-
             </div>
           )}
 

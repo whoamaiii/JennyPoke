@@ -108,67 +108,85 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
     window.location.reload();
   };
   return (
-    <div className="h-full flex flex-col p-8 overflow-y-auto">
-      <div className="max-w-7xl mx-auto flex-1 flex flex-col">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold flex items-center gap-3">
-            <Heart className="w-10 h-10 text-pokemon-red fill-pokemon-red" />
-            Faves ({favorites.length})
-          </h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={handleClearSession} variant="destructive" size="sm" className="flex items-center gap-1 text-xs">
-              <Trash className="w-3 h-3" />
-              Remove All
-            </Button>
-          </div>
-        </div>
-
-        {/* Search and Filters */}
-          {favorites.length > 0 && (
-            <div className="mb-12 space-y-6">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Search cards by name or set..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Select value={setFilter} onValueChange={setSetFilter}>
-                    <SelectTrigger className="w-[160px]">
-                      <SelectValue placeholder="Set" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Sets</SelectItem>
-                      {uniqueSets.map((set) => (
-                        <SelectItem key={set} value={set}>
-                          {set}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              {searchQuery || setFilter !== 'all' ? (
-                <div className="text-sm text-muted-foreground">
-                  Showing {filteredFavorites.length} of {favorites.length} cards
-                </div>
-              ) : null}
+    <div className="min-h-0 w-full overflow-y-auto">
+      <div className="max-w-7xl mx-auto p-8">
+        {/* Header section - only visible when there are favorites */}
+        {favorites.length > 0 && (
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-4xl font-bold flex items-center gap-3">
+              <Heart className="w-10 h-10 text-pokemon-red fill-pokemon-red" />
+              Faves ({favorites.length})
+            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={handleClearSession} variant="destructive" size="sm" className="flex items-center gap-1 text-xs">
+                <Trash className="w-3 h-3" />
+                Remove All
+              </Button>
             </div>
-          )}
+          </div>
+        )}
 
+        {/* Search and Filters - only show if there are favorites */}
+        {favorites.length > 0 && (
+          <div className="mb-8 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search cards by name or set..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Select value={setFilter} onValueChange={setSetFilter}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Set" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sets</SelectItem>
+                    {uniqueSets.map((set) => (
+                      <SelectItem key={set} value={set}>
+                        {set}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {searchQuery || setFilter !== 'all' ? (
+              <div className="text-sm text-muted-foreground">
+                Showing {filteredFavorites.length} of {favorites.length} cards
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* Content area - either empty state or grid of cards */}
         {favorites.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-center">
+          <div className="flex items-center justify-center text-center min-h-[70vh]">
             <div>
-              <p className="text-2xl text-muted-foreground mb-4">No favorites yet!</p>
-              <p className="text-muted-foreground">Swipe right on cards you like to add them to your collection.</p>
+              <div className="mb-6">
+                <Heart className="w-16 h-16 text-muted-foreground/30 mx-auto" />
+              </div>
+              <p className="text-3xl font-bold text-muted-foreground mb-4">No favorites yet!</p>
+              <p className="text-muted-foreground text-lg max-w-sm mx-auto">
+                Swipe <span className="font-semibold">right</span> on cards you like to add them to your collection.
+              </p>
+              <div className="mt-8">
+                <Button 
+                  onClick={onBackToHome}
+                  variant="outline"
+                  className="px-6"
+                >
+                  Back to Home
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-3 gap-6 mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
             {filteredFavorites.map((card) => (
               <div key={card.id} className="flex flex-col items-center">
                 <div 
