@@ -223,7 +223,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   return (
     <div ref={containerRef} className="relative w-full h-screen flex flex-col overflow-hidden">
       {/* Card area - top section */}
-      <div className="flex-1 flex items-center justify-center relative">
+      <div className="flex-1 flex items-center justify-center relative min-h-0">
         {/* Card stack background */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           {currentIndex < cards.length - 1 && (
@@ -268,18 +268,6 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
       {/* Controls area - bottom section */}
       <div className="pb-8 pt-4 flex flex-col items-center gap-4">
-        {/* Instructions */}
-        <div className="flex gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2 bg-card/80 backdrop-blur px-4 py-2 rounded-full">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Favorite</span>
-          </div>
-          <div className="flex items-center gap-2 bg-card/80 backdrop-blur px-4 py-2 rounded-full">
-            <ArrowRight className="w-4 h-4" />
-            <span className="hidden sm:inline">Skip</span>
-          </div>
-        </div>
-
         {/* Navigation row: Left arrow, Counter, Right arrow */}
         <div className="flex items-center gap-4">
           <button
