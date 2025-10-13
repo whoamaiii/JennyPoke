@@ -51,7 +51,7 @@ export const PackOpening = ({ onComplete }: PackOpeningProps) => {
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-50 min-h-screen">
+    <div className="fixed inset-0 bg-background flex items-center justify-center z-50 min-h-screen">
       <div className="relative flex items-center justify-center w-full h-full">
         {/* Pack */}
         <div
@@ -59,7 +59,6 @@ export const PackOpening = ({ onComplete }: PackOpeningProps) => {
           className="w-64 h-80 bg-gradient-to-br from-primary via-secondary to-accent rounded-3xl shadow-2xl flex items-center justify-center relative overflow-hidden"
         >
           <div className="text-center">
-            <img src={pokeballSvg} alt="Pokéball" className="w-16 h-16 mx-auto mb-4" />
             <p className="text-xl font-bold text-white">Opening Pack...</p>
           </div>
           {/* shine overlay */}
@@ -73,18 +72,7 @@ export const PackOpening = ({ onComplete }: PackOpeningProps) => {
           ref={cardsRef}
           className="absolute inset-0 flex items-center justify-center opacity-0 scale-0 pointer-events-none"
         >
-          <div className="relative">
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute w-16 h-24 bg-card rounded-lg shadow-lg"
-                style={{
-                  transform: `rotate(${i * 36}deg) translateY(-100px)`,
-                }}
-              />
-            ))}
-            <Loader2 className="w-16 h-16 animate-spin text-primary" />
-          </div>
+          <Loader2 className="w-16 h-16 animate-spin text-primary" />
         </div>
       </div>
     </div>

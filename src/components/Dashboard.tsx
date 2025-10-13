@@ -118,44 +118,49 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
       {/* Modal for selected card (controlled) */}
       <Dialog open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
         {selected && (
-          <DialogContent>
+          <DialogContent className="max-w-[95vw] sm:max-w-[500px] md:max-w-[700px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{selected.card.name}</DialogTitle>
+              <DialogTitle className="text-lg sm:text-xl">{selected.card.name}</DialogTitle>
             </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="flex justify-center">
-                {/* <div className="w-48 h-56"> */}
-                <div className="w-48 h-56">
-                  <img 
-                    src={selected.card.images.small || selected.card.images.large} 
-                    alt={selected.card.name} 
-                    className="w-full max-w-[245px] h-auto object-contain rounded-lg shadow-lg" 
-                  />
-                </div>
+            <div className="flex flex-col md:grid md:grid-cols-2 gap-6">
+              <div className="flex justify-center items-start">
+                <img 
+                  src={selected.card.images.large || selected.card.images.small} 
+                  alt={selected.card.name} 
+                  className="w-full max-w-[245px] h-auto object-contain rounded-lg shadow-lg" 
+                />
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Set: {selected.card.set.name}</p>
-                <p className="text-sm text-muted-foreground">Rarity: {selected.rarity || 'Unknown'}</p>
-                <p className="mt-4">
-                  {selected.card.attacks?.[0]?.name ? 
-                    `Attack: ${selected.card.attacks[0].name} (${selected.card.attacks[0].damage})` : 
-                    'No attack information available'}
-                </p>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Set</p>
+                  <p className="text-sm text-muted-foreground">{selected.card.set.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Rarity</p>
+                  <p className="text-sm text-muted-foreground">{selected.rarity || 'Unknown'}</p>
+                </div>
+                {selected.card.attacks?.[0]?.name && (
+                  <div>
+                    <p className="text-sm font-semibold">Attack</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selected.card.attacks[0].name} ({selected.card.attacks[0].damage || 'N/A'})
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-            <DialogFooter>
-              <div className="flex gap-2 w-full justify-end">
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    onRemoveFavorite(selected.id);
-                    setSelected(null);
-                  }}
-                >
-                  Remove
-                </Button>
-                <Button onClick={() => setSelected(null)} variant="outline">Close</Button>
-              </div>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  onRemoveFavorite(selected.id);
+                  setSelected(null);
+                }}
+                className="w-full sm:w-auto"
+              >
+                Remove
+              </Button>
+              <Button onClick={() => setSelected(null)} variant="outline" className="w-full sm:w-auto">Close</Button>
             </DialogFooter>
           </DialogContent>
         )}

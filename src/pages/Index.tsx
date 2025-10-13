@@ -313,13 +313,19 @@ const Index = () => {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
-                  onClick={handleOpenPack}
+                  onClick={() => {
+                    // Reset state and open new pack
+                    setCurrentPack([]);
+                    setError(null);
+                    handleOpenPack();
+                  }}
+                  disabled={isLoading}
                   variant="hero"
                   size="lg"
                   className="text-lg px-8 py-6 h-auto"
                 >
                   <Sparkles className="mr-2 w-6 h-6" />
-                  Open Another Pack
+                  {isLoading ? 'Opening...' : 'Open Another Pack'}
                 </Button>
                 <Button
                   onClick={() => setView('dashboard')}

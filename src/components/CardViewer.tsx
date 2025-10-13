@@ -94,6 +94,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
     gsap.to(cardRef.current, {
       x: xOffset,
+      y: 0, // Ensure consistent exit position
       rotation: rotation,
       opacity: 0,
       duration: 0.5,
@@ -104,10 +105,11 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         if (currentIndex < cards.length - 1) {
           setCurrentIndex(currentIndex + 1);
           
-          // Reset card position
+          // Reset card to exact center position
           if (cardRef.current) {
             gsap.set(cardRef.current, {
               x: 0,
+              y: 0, // Fixed: Always reset to center
               rotation: 0,
               opacity: 1,
             });
@@ -132,7 +134,8 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
       if (isAnimating || !cardRef.current) return;
 
       const deltaX = e.deltaX;
-      const deltaY = e.deltaY;
+      // Limit vertical movement to prevent cards from appearing at wrong positions
+      const deltaY = Math.max(-50, Math.min(50, e.deltaY));
       const rotation = deltaX / 20;
 
       gsap.set(cardRef.current, {
@@ -218,67 +221,91 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   if (!currentCard) return null;
 
   return (
-    <div ref={containerRef} className="relative w-full h-screen flex items-center justify-center overflow-hidden">
-      {/* Card stack background */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        {currentIndex < cards.length - 1 && (
-          <div className="opacity-30 scale-95 blur-sm transform translate-y-2">
-            <PokemonCard card={cards[currentIndex + 1]} showBack />
-          </div>
-        )}
-      </div>
+    <div ref={containerRef} className="relative w-full h-screen flex flex-col overflow-hidden">
+      {/* Card area - top section */}
+      <div className="flex-1 flex items-center justify-center relative">
+        {/* Card stack background */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          {currentIndex < cards.length - 1 && (
+            <div className="opacity-30 scale-95 blur-sm transform translate-y-2">
+              <PokemonCard card={cards[currentIndex + 1]} showBack />
+            </div>
+          )}
+        </div>
 
-      {/* Current card */}
-      <div
-        ref={cardRef}
-        className="relative"
-        style={{
-          perspective: '1000px',
-          transformStyle: 'preserve-3d',
-        }}
-      >
-        <div style={{ backfaceVisibility: 'hidden' }}>
-          <PokemonCard card={currentCard} showBack={false} />
+        {/* Current card */}
+        <div
+          ref={cardRef}
+          className="relative"
+          style={{
+            perspective: '1000px',
+            transformStyle: 'preserve-3d',
+          }}
+        >
+          <div style={{ backfaceVisibility: 'hidden' }}>
+            <PokemonCard card={currentCard} showBack={false} />
+          </div>
+        </div>
+
+        {/* Heart animation overlay */}
+        <div
+          ref={heartRef}
+          className="absolute pointer-events-none"
+          style={{ opacity: 0 }}
+        >
+          <Heart className="w-16 h-16 text-red-500 fill-red-500 drop-shadow-2xl" />
+        </div>
+
+        {/* Skip animation overlay */}
+        <div
+          ref={skipRef}
+          className="absolute pointer-events-none"
+          style={{ opacity: 0 }}
+        >
+          <X className="w-16 h-16 text-gray-500 drop-shadow-2xl" />
         </div>
       </div>
 
-      {/* Heart animation overlay */}
-      <div
-        ref={heartRef}
-        className="absolute pointer-events-none"
-        style={{ opacity: 0 }}
-      >
-        <Heart className="w-16 h-16 text-red-500 fill-red-500 drop-shadow-2xl" />
-      </div>
-
-      {/* Skip animation overlay */}
-      <div
-        ref={skipRef}
-        className="absolute pointer-events-none"
-        style={{ opacity: 0 }}
-      >
-        <X className="w-16 h-16 text-gray-500 drop-shadow-2xl" />
-      </div>
-
-      {/* Instructions */}
-      <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+      {/* Controls area - bottom section */}
+      <div className="pb-8 pt-4 flex flex-col items-center gap-4">
+        {/* Instructions */}
         <div className="flex gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2 bg-card/80 backdrop-blur px-4 py-2 rounded-full">
             <ArrowLeft className="w-4 h-4" />
-            <span>Favorite</span>
+            <span className="hidden sm:inline">Favorite</span>
           </div>
           <div className="flex items-center gap-2 bg-card/80 backdrop-blur px-4 py-2 rounded-full">
             <ArrowRight className="w-4 h-4" />
-            <span>Skip</span>
+            <span className="hidden sm:inline">Skip</span>
           </div>
         </div>
-      </div>
 
-      {/* Counter */}
-      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur px-6 py-3 rounded-full shadow-lg border border-border">
-        <p className="text-sm font-semibold">
-          {currentIndex + 1} / {cards.length}
-        </p>
+        {/* Navigation row: Left arrow, Counter, Right arrow */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => swipeCard('left')}
+            disabled={isAnimating}
+            className="p-3 rounded-full bg-card/90 backdrop-blur border border-border hover:bg-card/100 transition-colors disabled:opacity-50"
+            aria-label="Favorite (swipe left)"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+
+          <div className="bg-card/90 backdrop-blur px-6 py-3 rounded-full shadow-lg border border-border min-w-[100px] text-center">
+            <p className="text-sm font-semibold">
+              {currentIndex + 1} / {cards.length}
+            </p>
+          </div>
+
+          <button
+            onClick={() => swipeCard('right')}
+            disabled={isAnimating}
+            className="p-3 rounded-full bg-card/90 backdrop-blur border border-border hover:bg-card/100 transition-colors disabled:opacity-50"
+            aria-label="Skip (swipe right)"
+          >
+            <ArrowRight className="w-6 h-6" />
+          </button>
+        </div>
       </div>
     </div>
   );
