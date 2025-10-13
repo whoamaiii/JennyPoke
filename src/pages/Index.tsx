@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSessionStorage } from '@/hooks/useSessionStorage';
 import { CardData } from '@/types/pokemon';
-import { openPack, testApiKey } from '@/services/pokemonTcgApi';
+import { openPack } from '@/services/pokemonTcgApi';
 import { Button } from '@/components/ui/button';
 import { CardViewer } from '@/components/CardViewer';
 import { PackOpening } from '@/components/PackOpening';
@@ -88,7 +88,6 @@ const Index = () => {
   const [error, setError] = useState<PokemonTCGError | null>(null);
   const viewRootRef = useRef<HTMLDivElement | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [isTestingApi, setIsTestingApi] = useState(false);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [isInitialDownloadComplete, setIsInitialDownloadComplete] = useState(false);
   const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
@@ -170,7 +169,7 @@ const Index = () => {
   }, []);
 
   const handleOpenPack = async () => {
-    if (isLoading || isTestingApi || !isInitialDownloadComplete) return; // prevent multiple clicks and simultaneous operations
+    if (isLoading || !isInitialDownloadComplete) return; // prevent multiple clicks and simultaneous operations
     
     setIsLoading(true);
     setError(null); // Clear any previous errors
@@ -274,7 +273,7 @@ const Index = () => {
       markCardsAsShown(sessionCards.map(card => card.id));
       
       // Trigger background refresh if needed
-      if (needsRefresh && !isTestingApi) {
+      if (needsRefresh) {
         console.log('🔄 Background refresh triggered - downloading more cards');
         toast.info('Downloading more cards in background...');
         setIsBackgroundLoading(true);
@@ -335,6 +334,14 @@ const Index = () => {
 
   const handleSwipe = async (cardId: string, favorite: boolean) => {
     if (favorite) {
+      // Check if adding this card would exceed the 32 card limit
+      if (favorites.length >= 32) {
+        toast.error('Cannot add more cards. You have reached the 32 card limit. Remove some cards from favorites to add new ones.', {
+          duration: 5000,
+        });
+        return;
+      }
+      
       const card = currentPack.find((c) => c.id === cardId);
       if (card) {
         setFavorites([...favorites, card]);
@@ -424,7 +431,7 @@ const Index = () => {
               
               <Button
                 onClick={handleOpenPack}
-                disabled={isLoading || isTestingApi || !isInitialDownloadComplete || isBackgroundLoading}
+                disabled={isLoading || !isInitialDownloadComplete || isBackgroundLoading}
                 variant="hero"
                 size="lg"
                 className="text-lg px-8 py-6"
@@ -449,32 +456,6 @@ const Index = () => {
               </Button>
 
 
-              <Button
-                onClick={async () => {
-                  if (isTestingApi || isLoading || !isInitialDownloadComplete || isBackgroundLoading) return; // prevent multiple clicks and simultaneous operations
-                  setIsTestingApi(true);
-                  toast.info('Testing API key...');
-                  try {
-                    const success = await testApiKey();
-                    if (success) {
-                      toast.success('API key is working correctly!');
-                    } else {
-                      toast.error('API key test failed. Please check your configuration.');
-                    }
-                  } catch (error) {
-                    toast.error('API key test failed. Please check your configuration.');
-                  } finally {
-                    setIsTestingApi(false);
-                  }
-                }}
-                disabled={isTestingApi || isLoading || !isInitialDownloadComplete || isBackgroundLoading}
-                variant="outline"
-                size="sm"
-                className="mt-4 text-sm"
-                aria-label={!isInitialDownloadComplete ? "Preparing cards, API test unavailable" : isTestingApi ? "Testing API key, please wait" : "Test API key connection"}
-              >
-                {!isInitialDownloadComplete ? 'Preparing...' : isTestingApi ? 'Testing...' : 'Test API Key'}
-              </Button>
 
 
             </div>

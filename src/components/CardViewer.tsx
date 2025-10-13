@@ -14,6 +14,7 @@ interface CardViewerProps {
 export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const heartRef = useRef<HTMLDivElement>(null);
@@ -77,8 +78,21 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     }
   };
 
+  const handleCardReveal = () => {
+    if (isRevealed || isAnimating) return;
+    setIsRevealed(true);
+    
+    // Add a subtle reveal animation
+    if (cardRef.current) {
+      gsap.fromTo(cardRef.current, 
+        { scale: 0.95, opacity: 0.8 },
+        { scale: 1, opacity: 1, duration: 0.3, ease: 'power2.out' }
+      );
+    }
+  };
+
   const swipeCard = useCallback((direction: 'left' | 'right') => {
-    if (isAnimating || !cardRef.current || !currentCard) return;
+    if (isAnimating || !cardRef.current || !currentCard || !isRevealed) return;
     
     setIsAnimating(true);
     const isFavorite = direction === 'left';
@@ -107,6 +121,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         
         if (currentIndex < cards.length - 1) {
           setCurrentIndex(currentIndex + 1);
+          setIsRevealed(false); // Reset revealed state for next card
           
           // Reset card to exact center position
           if (cardRef.current) {
@@ -134,7 +149,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     hammer.get('pan').set({ direction: Hammer.DIRECTION_ALL, threshold: 10 });
 
     hammer.on('panmove', (e) => {
-      if (isAnimating || !cardRef.current) return;
+      if (isAnimating || !cardRef.current || !isRevealed) return;
 
       const deltaX = e.deltaX;
       // Limit vertical movement to prevent cards from appearing at wrong positions
@@ -150,7 +165,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     });
 
     hammer.on('panend', (e) => {
-      if (isAnimating || !cardRef.current) return;
+      if (isAnimating || !cardRef.current || !isRevealed) return;
 
       const deltaX = e.deltaX;
       const velocityX = e.velocityX;
@@ -187,7 +202,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isAnimating) return;
+      if (isAnimating || !isRevealed) return;
 
       switch (e.key) {
         case 'ArrowLeft':
@@ -214,6 +229,8 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(1.2)' }
       );
     }
+    // Reset revealed state for new card
+    setIsRevealed(false);
   }, [currentIndex]);
 
   // Prefetch next 2 images for smoothness
@@ -245,15 +262,32 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         {/* Current card */}
         <div
           ref={cardRef}
-          className="relative"
+          className="relative cursor-pointer"
           style={{
             perspective: '1000px',
             transformStyle: 'preserve-3d',
           }}
+          onClick={handleCardReveal}
         >
+          {!isRevealed ? (
+            // Show card back initially
+            <div className="w-80 h-96 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-2xl flex items-center justify-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-2xl m-2 flex items-center justify-center">
+                <div className="text-center text-white">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-white rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-red-500 rounded-full"></div>
+                  </div>
+                  <p className="text-lg font-bold">Tap to reveal</p>
+                  <p className="text-sm opacity-80">Your Pokémon card</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Show actual card after reveal
           <div style={{ backfaceVisibility: 'hidden' }}>
             <PokemonCard card={currentCard} showBack={false} />
           </div>
+          )}
         </div>
 
         {/* Heart animation overlay */}
@@ -281,7 +315,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         <div className="flex items-center gap-4">
           <button
             onClick={() => swipeCard('left')}
-            disabled={isAnimating}
+            disabled={isAnimating || !isRevealed}
             className="p-3 rounded-full bg-card/90 backdrop-blur border border-border hover:bg-card/100 transition-colors disabled:opacity-50"
             aria-label="Favorite (swipe left)"
           >
@@ -296,13 +330,20 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
           <button
             onClick={() => swipeCard('right')}
-            disabled={isAnimating}
+            disabled={isAnimating || !isRevealed}
             className="p-3 rounded-full bg-card/90 backdrop-blur border border-border hover:bg-card/100 transition-colors disabled:opacity-50"
             aria-label="Dismiss (swipe right)"
           >
             <X className="w-6 h-6 text-gray-500" />
           </button>
         </div>
+        
+        {/* Tap to reveal instruction */}
+        {!isRevealed && (
+          <div className="text-center text-muted-foreground">
+            <p className="text-sm">Tap the card to reveal it</p>
+          </div>
+        )}
       </div>
     </div>
   );

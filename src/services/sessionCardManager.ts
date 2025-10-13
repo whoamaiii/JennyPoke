@@ -17,7 +17,7 @@ const CARDS_TO_LOAD = 32; // Maximum number of cards to keep in session storage
 const REFRESH_THRESHOLD = 16; // Number of available cards before triggering a refresh
 const INITIAL_LOAD = 24; // Number of cards to load initially
 const PACK_SIZE = 8; // Number of cards in a pack
-const MAX_RETRY_ATTEMPTS = 3; // Maximum retries for failed downloads
+// Removed retry logic - grab another card on first failure
 const DOWNLOAD_TIMEOUT = 10000; // 10 second timeout per download
 
 // State management
@@ -195,17 +195,18 @@ async function tryDownloadImage(imageUrl: string): Promise<Blob | null> {
 }
 
 /**
- * Download a single card image and convert to data URL with retries
+ * Download a single card image and convert to data URL
+ * Returns null on failure - no retries, just grab another card
  */
-async function downloadCardImage(card: CardCSVRow, retryCount = 0): Promise<SessionCard | null> {
+async function downloadCardImage(card: CardCSVRow): Promise<SessionCard | null> {
   try {
     console.log(`[SessionCardManager] Downloading and compressing card image: ${card.set_id}-${card.card_number} from ${card.image_url}`);
     
-    // Use the new image compression utility with smaller size for storage efficiency
+    // Use the new image compression utility with higher quality for better image clarity
     const compressedResult = await downloadAndCompressImage(card.image_url, {
-      maxWidth: 400,
-      maxHeight: 300,
-      quality: 0.6,
+      maxWidth: 600,
+      maxHeight: 450,
+      quality: 0.85,
       format: 'webp'
     });
     

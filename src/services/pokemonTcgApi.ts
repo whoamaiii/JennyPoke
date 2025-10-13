@@ -4,7 +4,7 @@ import { PokemonTCGCard, CardData } from '@/types/pokemon';
 const API_BASE = 'https://api.pokemontcg.io/v2';
 // CORS proxy for development - remove in production and use backend API
 const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
-const USE_CORS_PROXY = false; // Set to false in production
+const USE_CORS_PROXY = true; // Enable CORS proxy for testing
 
 const API_TIMEOUT = 400000; // 400 seconds (6.67 minutes) timeout - more than double the observed 139.2s response time
 

@@ -51,8 +51,8 @@ export const PackOpening = ({ onComplete }: PackOpeningProps) => {
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 bg-background flex items-center justify-center z-50 min-h-screen">
-      <div className="relative flex items-center justify-center w-full h-full">
+    <div className="fixed inset-0 bg-background flex items-center justify-center z-50 overflow-hidden">
+      <div className="relative flex items-center justify-center w-full h-full max-h-screen">
         {/* Pack */}
         <div
           ref={packRef}
