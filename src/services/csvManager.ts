@@ -325,18 +325,43 @@ export async function refreshCSVData(): Promise<boolean> {
 }
 
 /**
- * Get all cards with 'pending' status for download
+ * Get all cards available for use (pending or success status)
  */
 export async function getPendingCards(): Promise<CardCSVRow[]> {
+  console.log('[CSVManager] Loading CSV data to find available cards...');
   const { cards } = await loadCSVData();
-  return cards.filter(card => card.status === 'pending');
+  console.log(`[CSVManager] Loaded ${cards.length} total cards from CSV`);
+  
+  // Log first few cards to see their status
+  if (cards.length > 0) {
+    console.log('[CSVManager] First 3 cards:', cards.slice(0, 3).map(c => ({
+      id: `${c.set_id}-${c.card_number}`,
+      status: c.status,
+      image_url: c.image_url
+    })));
+  }
+  
+  // Use cards with 'success' status (already downloaded) or 'pending' status
+  // Filter out only 'failed' or 'error' status cards
+  const availableCards = cards.filter(card => 
+    card.status === 'pending' || card.status === 'success'
+  );
+  console.log(`[CSVManager] Found ${availableCards.length} available cards (pending or success status)`);
+  
+  return availableCards;
 }
 
 /**
  * Get a specified number of random cards for download
  */
 export async function getRandomPendingCards(count: number = 100): Promise<CardCSVRow[]> {
+  console.log(`[CSVManager] Getting ${count} random pending cards...`);
   const pendingCards = await getPendingCards();
+  
+  if (pendingCards.length === 0) {
+    console.warn('[CSVManager] No pending cards found! Check CSV file status column.');
+    return [];
+  }
   
   // Shuffle the array (Fisher-Yates algorithm)
   for (let i = pendingCards.length - 1; i > 0; i--) {
@@ -344,5 +369,13 @@ export async function getRandomPendingCards(count: number = 100): Promise<CardCS
     [pendingCards[i], pendingCards[j]] = [pendingCards[j], pendingCards[i]];
   }
   
-  return pendingCards.slice(0, count);
+  const selectedCards = pendingCards.slice(0, count);
+  console.log(`[CSVManager] Selected ${selectedCards.length} random cards for download`);
+  console.log('[CSVManager] First 3 selected cards:', selectedCards.slice(0, 3).map(c => ({
+    id: `${c.set_id}-${c.card_number}`,
+    name: c.set_name,
+    image_url: c.image_url
+  })));
+  
+  return selectedCards;
 }

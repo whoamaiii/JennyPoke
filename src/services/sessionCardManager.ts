@@ -211,9 +211,17 @@ export async function refreshSessionCards(): Promise<boolean> {
     
     // Get random cards to download - use a smaller batch first to ensure faster initial loading
     const initialBatchSize = 20; // Start with a smaller batch for quick success
+    console.log(`[SessionCardManager] Requesting ${initialBatchSize} random cards from CSV...`);
     const randomCards = await getRandomPendingCards(initialBatchSize);
     
     console.log(`[SessionCardManager] Found ${randomCards.length} cards to download`);
+    if (randomCards.length > 0) {
+      console.log('[SessionCardManager] Cards to download:', randomCards.map(c => ({
+        id: `${c.set_id}-${c.card_number}`,
+        set: c.set_name,
+        url: c.image_url
+      })));
+    }
     
     if (randomCards.length === 0) {
       console.error('[SessionCardManager] No cards available for download');
