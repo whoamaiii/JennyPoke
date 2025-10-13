@@ -7,6 +7,13 @@ import { CardSkeleton } from './CardSkeleton';
 import { preloadImage, createImagePlaceholder } from '@/lib/imageUtils';
 import { getCardDimensions, getImageContainerClasses, getImageClasses } from '@/lib/cardUtils';
 
+// Preload card back image as soon as this component is imported
+const preloadCardBack = () => {
+  const img = new Image();
+  img.src = cardBackImage;
+};
+preloadCardBack();
+
 // Define the three required sizes: 'grid', 'small', and 'large'
 type CardSize = 'grid' | 'small' | 'large';
 
@@ -79,7 +86,9 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
         <img 
           src={cardBackImage} 
           alt="Pokémon Card Back" 
-          className="w-full h-full object-contain bg-card" 
+          className="w-full h-full object-contain bg-card"
+          loading="eager"
+          decoding="sync"
         />
       </div>
     );
@@ -123,8 +132,11 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
     <div
       ref={elRef}
       onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
+      {...(onClick ? {
+        role: "button",
+        tabIndex: 0,
+        "aria-label": "Pokémon card - click to interact"
+      } : {})}
       className={cn(
         'relative rounded-2xl overflow-hidden shadow-2xl bg-card transform will-change-transform',
         'transition-transform',
@@ -148,7 +160,8 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
         {imgSmall && imgLarge && imgSmall !== imgLarge && size !== 'small' && (
           <img
             src={imgSmall}
-            aria-hidden
+            aria-hidden="true"
+            alt=""
             className={cn('absolute inset-0', getImageClasses(), 'transition-opacity duration-500', loaded ? 'opacity-0' : 'opacity-100')}
           />
         )}

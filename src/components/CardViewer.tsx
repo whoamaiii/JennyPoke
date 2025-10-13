@@ -80,14 +80,21 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
   const handleCardReveal = () => {
     if (isRevealed || isAnimating) return;
-    setIsRevealed(true);
     
-    // Add a subtle reveal animation
-    if (cardRef.current) {
-      gsap.fromTo(cardRef.current, 
-        { scale: 0.95, opacity: 0.8 },
-        { scale: 1, opacity: 1, duration: 0.3, ease: 'power2.out' }
-      );
+    try {
+      setIsRevealed(true);
+      
+      // Add a subtle reveal animation
+      if (cardRef.current) {
+        gsap.fromTo(cardRef.current, 
+          { scale: 0.95, opacity: 0.8 },
+          { scale: 1, opacity: 1, duration: 0.3, ease: 'power2.out' }
+        );
+      }
+    } catch (error) {
+      console.error('Error revealing card:', error);
+      // Prevent UI from getting stuck if there's an error
+      setIsAnimating(false);
     }
   };
 
@@ -235,13 +242,30 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
   // Prefetch next 2 images for smoothness
   useEffect(() => {
+    // Safety check for cards array and valid card data
+    if (!cards || !Array.isArray(cards)) return;
+    
     const toPrefetch = [] as string[];
-    if (cards[currentIndex + 1]) toPrefetch.push(cards[currentIndex + 1].card.images.small || cards[currentIndex + 1].card.images.large);
-    if (cards[currentIndex + 2]) toPrefetch.push(cards[currentIndex + 2].card.images.small || cards[currentIndex + 2].card.images.large);
-    toPrefetch.forEach((src) => {
-      const img = new Image();
-      img.src = src;
-    });
+    
+    // Check for next card and ensure it has valid image data
+    if (cards[currentIndex + 1] && cards[currentIndex + 1].card && cards[currentIndex + 1].card.images) {
+      const nextCardImage = cards[currentIndex + 1].card.images.small || cards[currentIndex + 1].card.images.large;
+      if (nextCardImage) toPrefetch.push(nextCardImage);
+    }
+    
+    // Check for card after next and ensure it has valid image data
+    if (cards[currentIndex + 2] && cards[currentIndex + 2].card && cards[currentIndex + 2].card.images) {
+      const nextNextCardImage = cards[currentIndex + 2].card.images.small || cards[currentIndex + 2].card.images.large;
+      if (nextNextCardImage) toPrefetch.push(nextNextCardImage);
+    }
+    
+    // Only prefetch if we have valid image URLs
+    if (toPrefetch.length > 0) {
+      toPrefetch.forEach((src) => {
+        const img = new Image();
+        img.src = src;
+      });
+    }
   }, [currentIndex, cards]);
 
   if (!currentCard) return null;
@@ -252,11 +276,11 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
       <div className="flex-1 flex items-center justify-center relative min-h-0">
         {/* Card stack background */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          {currentIndex < cards.length - 1 && (
+          {currentIndex < cards.length - 1 && cards[currentIndex + 1] && cards[currentIndex + 1].card ? (
             <div className="opacity-30 scale-95 blur-sm transform translate-y-2">
               <PokemonCard card={cards[currentIndex + 1]} showBack />
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Current card */}
@@ -274,10 +298,15 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
             <div style={{ backfaceVisibility: 'hidden' }}>
               <PokemonCard card={currentCard} showBack={true} />
             </div>
-          ) : (
-            // Show actual card after reveal
+          ) : currentCard?.card?.images ? (
+            // Show actual card after reveal - with validation to prevent errors
             <div style={{ backfaceVisibility: 'hidden' }}>
               <PokemonCard card={currentCard} showBack={false} />
+            </div>
+          ) : (
+            // Fallback if card data is incomplete
+            <div style={{ backfaceVisibility: 'hidden' }}>
+              <PokemonCard card={currentCard} showBack={true} />
             </div>
           )}
         </div>

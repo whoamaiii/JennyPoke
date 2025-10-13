@@ -32,33 +32,61 @@ const StorageStatus = ({ savedCardsCount }: { savedCardsCount: number }) => {
   });
 
   useEffect(() => {
+    let isMounted = true;
+    
     const updateStorageInfo = async () => {
+      // Skip update if component is unmounted
+      if (!isMounted) return;
+      
       try {
         const { canOpenPack, getSessionStats } = await import('@/services/sessionCardManager');
+        
+        // Skip update if component is unmounted
+        if (!isMounted) return;
+        
         const packCheck = canOpenPack(savedCardsCount);
         const stats = getSessionStats();
         
-        setStorageInfo({
-          canOpen: packCheck.canOpen,
-          message: packCheck.message,
-          remainingSlots: packCheck.remainingSlots,
-          sessionCards: stats.totalCards
+        setStorageInfo(prevState => {
+          // Don't update state if values haven't changed
+          if (prevState.canOpen === packCheck.canOpen &&
+              prevState.remainingSlots === packCheck.remainingSlots &&
+              prevState.sessionCards === stats.totalCards) {
+            return prevState;
+          }
+          
+          return {
+            canOpen: packCheck.canOpen,
+            message: packCheck.message,
+            remainingSlots: packCheck.remainingSlots,
+            sessionCards: stats.totalCards
+          };
         });
       } catch (error) {
         console.error('Error checking storage capacity:', error);
-        setStorageInfo({
+        
+        // Skip update if component is unmounted
+        if (!isMounted) return;
+        
+        setStorageInfo(prevState => ({
+          ...prevState,
           canOpen: true,
-          message: 'Storage status unavailable',
-          remainingSlots: 32,
-          sessionCards: 0
-        });
+          message: 'Storage status unavailable'
+        }));
       }
     };
 
+    // Initial update
     updateStorageInfo();
-    // Update every 3 seconds
+    
+    // Update periodically but not too frequently
     const interval = setInterval(updateStorageInfo, 3000);
-    return () => clearInterval(interval);
+    
+    // Cleanup
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [savedCardsCount]);
 
   return (
@@ -124,9 +152,19 @@ const Index = () => {
 
   // Check initial download status on mount
   useEffect(() => {
+    let isMounted = true;
+    let checkInterval: number | null = null;
+    let timeoutId: number | null = null;
+    
     const checkInitialDownloadStatus = async () => {
+      if (!isMounted) return;
+      
       try {
         const { getSessionStats } = await import('@/services/sessionCardManager');
+        
+        // Prevent state updates if unmounted
+        if (!isMounted) return;
+        
         const stats = getSessionStats();
         
         // If we have cards available, initial download is complete
@@ -139,20 +177,38 @@ const Index = () => {
           toast.info('Preparing cards for offline play...');
           
           // Check periodically until cards are available
-          const checkInterval = setInterval(async () => {
-            const currentStats = getSessionStats();
-            if (currentStats.totalCards > 0) {
-              setIsInitialDownloadComplete(true);
-              clearInterval(checkInterval);
-              console.log('[Index] Initial download completed, cards available:', currentStats.totalCards);
-              toast.success('Cards ready! You can now open packs.');
+          // Store the interval ID so we can clear it in cleanup
+          checkInterval = window.setInterval(() => {
+            if (!isMounted) return;
+            
+            try {
+              const currentStats = getSessionStats();
+              if (currentStats.totalCards > 0) {
+                if (isMounted) {
+                  setIsInitialDownloadComplete(true);
+                  console.log('[Index] Initial download completed, cards available:', currentStats.totalCards);
+                  toast.success('Cards ready! You can now open packs.');
+                }
+                
+                // Clear the interval once we have cards
+                if (checkInterval !== null) {
+                  window.clearInterval(checkInterval);
+                  checkInterval = null;
+                }
+              }
+            } catch (checkError) {
+              console.error('[Index] Error during periodic check:', checkError);
             }
           }, 1000);
           
           // Clear interval after 30 seconds to avoid infinite checking
-          setTimeout(() => {
-            clearInterval(checkInterval);
-            if (!isInitialDownloadComplete) {
+          timeoutId = window.setTimeout(() => {
+            if (checkInterval !== null) {
+              window.clearInterval(checkInterval);
+              checkInterval = null;
+            }
+            
+            if (isMounted && !isInitialDownloadComplete) {
               console.warn('[Index] Initial download timeout, allowing pack opening anyway');
               setIsInitialDownloadComplete(true);
             }
@@ -161,12 +217,27 @@ const Index = () => {
       } catch (error) {
         console.error('[Index] Error checking initial download status:', error);
         // Allow pack opening even if check fails
-        setIsInitialDownloadComplete(true);
+        if (isMounted) {
+          setIsInitialDownloadComplete(true);
+        }
       }
     };
     
     checkInitialDownloadStatus();
-  }, []);
+    
+    // Clean up all timers when component unmounts
+    return () => {
+      isMounted = false;
+      
+      if (checkInterval !== null) {
+        window.clearInterval(checkInterval);
+      }
+      
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []); // No dependencies - only run once on mount
 
   const handleOpenPack = async () => {
     if (isLoading || !isInitialDownloadComplete) return; // prevent multiple clicks and simultaneous operations

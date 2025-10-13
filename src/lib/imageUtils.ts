@@ -186,10 +186,20 @@ export function preloadImage(
   onProgress?: (progress: number) => void
 ): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
+    // Check if image is already in browser cache
+    const cachedImage = getCachedImage(src);
+    if (cachedImage) {
+      onProgress?.(100);
+      resolve(cachedImage);
+      return;
+    }
+
     const img = new Image();
     
     img.onload = () => {
       onProgress?.(100);
+      // Add to our in-memory cache
+      cacheImage(src, img);
       resolve(img);
     };
     
@@ -197,7 +207,16 @@ export function preloadImage(
       reject(new Error(`Failed to load image: ${src}`));
     };
     
-    // Simulate progress for better UX
+    // For static assets like card backs, prioritize loading
+    if (src.includes('card-back')) {
+      img.fetchPriority = 'high';
+      img.decoding = 'sync';
+      // Don't show loading progress for card back - it should be instant
+      img.src = src;
+      return;
+    }
+    
+    // Simulate progress for better UX for other images
     let progress = 0;
     const progressInterval = setInterval(() => {
       progress += Math.random() * 20;
@@ -211,3 +230,32 @@ export function preloadImage(
     img.src = src;
   });
 }
+
+// Simple in-memory image cache
+const imageCache = new Map<string, HTMLImageElement>();
+
+function cacheImage(src: string, img: HTMLImageElement): void {
+  imageCache.set(src, img);
+}
+
+function getCachedImage(src: string): HTMLImageElement | undefined {
+  return imageCache.get(src);
+}
+
+// Preload essential assets (like card back) on module load
+export function preloadEssentialAssets(): void {
+  try {
+    // This will run when the app starts to preload the card back image
+    import('@/assets/pokemon-card-back.png').then(module => {
+      const img = new Image();
+      img.src = module.default;
+      img.decoding = 'sync';
+      cacheImage(module.default, img);
+    });
+  } catch (error) {
+    console.error('Failed to preload essential assets:', error);
+  }
+}
+
+// Call preload immediately
+preloadEssentialAssets();
