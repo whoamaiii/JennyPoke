@@ -125,7 +125,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
 
         {/* Search and Filters */}
           {favorites.length > 0 && (
-            <div className="mb-12 space-y-6">
+            <div className="mb-20 space-y-6">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />

@@ -194,6 +194,7 @@ const Index = () => {
       
       // Check if user can open a pack based on their saved cards
       const packCheck = canOpenPack(favorites.length);
+      console.log(`[Index] Pack check: ${packCheck.message}`);
       if (!packCheck.canOpen) {
         toast.error(packCheck.message, {
           duration: 5000,
@@ -204,8 +205,8 @@ const Index = () => {
       
       // Check if we need to download more cards for session storage
       const downloadCheck = shouldDownloadMoreCards(favorites.length);
+      console.log(`[Index] Download check: ${downloadCheck.reason}`);
       if (downloadCheck.shouldDownload) {
-        console.log(`[Index] ${downloadCheck.reason}`);
         toast.info('Downloading more cards in background...');
         refreshSessionCards();
       }
@@ -350,8 +351,8 @@ const Index = () => {
         
         // Check if we need to download more cards after dismissing
         const downloadCheck = shouldDownloadMoreCards(favorites.length);
+        console.log(`[Index] After dismissing card - ${downloadCheck.reason}`);
         if (downloadCheck.shouldDownload) {
-          console.log(`[Index] ${downloadCheck.reason}`);
           toast.info('Downloading more cards in background...');
           refreshSessionCards();
         }
@@ -447,10 +448,6 @@ const Index = () => {
                 )}
               </Button>
 
-              {/* Storage Status Indicator */}
-              <div className="mt-4 text-sm text-muted-foreground">
-                <StorageStatus savedCardsCount={favorites.length} />
-              </div>
 
               <Button
                 onClick={async () => {
@@ -480,18 +477,6 @@ const Index = () => {
               </Button>
 
 
-              {error && (
-                <div className="mt-6 flex justify-center">
-                  <Button
-                    onClick={handleRetry}
-                    disabled={isLoading || isTestingApi || !isInitialDownloadComplete || isBackgroundLoading}
-                    variant="outline"
-                    size="sm"
-                  >
-                    {!isInitialDownloadComplete ? 'Preparing...' : isLoading ? 'Retrying...' : 'Try Again'}
-                  </Button>
-                </div>
-              )}
             </div>
           )}
 

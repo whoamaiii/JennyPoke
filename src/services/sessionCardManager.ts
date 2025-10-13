@@ -222,29 +222,10 @@ async function downloadCardImage(card: CardCSVRow, retryCount = 0): Promise<Sess
     };
   } catch (error) {
     console.error(`[SessionCardManager] Error downloading card ${card.set_id}-${card.card_number}:`, error);
+    console.log(`[SessionCardManager] Skipping failed card ${card.set_id}-${card.card_number}, moving to next card`);
     
-    // Retry with exponential backoff if we haven't exceeded max retries
-    if (retryCount < MAX_RETRY_ATTEMPTS) {
-      const delay = Math.pow(2, retryCount) * 1000;
-      console.log(`[SessionCardManager] Retry ${retryCount + 1}/${MAX_RETRY_ATTEMPTS} after error, waiting ${delay}ms`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return downloadCardImage(card, retryCount + 1);
-    }
-    
-    // If all retries failed, create a placeholder with correct aspect ratio
-    console.warn(`[SessionCardManager] Creating placeholder for failed card ${card.set_id}-${card.card_number}`);
-    // Use smaller size to match compressed images (2.5:3.5 aspect ratio)
-    const placeholder = createImagePlaceholder(200, 280);
-    
-    return {
-      id: `${card.set_id}-${card.card_number}`,
-      set_id: card.set_id,
-      set_name: card.set_name,
-      card_number: card.card_number,
-      image_url: card.image_url,
-      imageData: placeholder,
-      filename: card.filename
-    };
+    // Skip this card and return null - no retries, no placeholders
+    return null;
   }
 }
 
