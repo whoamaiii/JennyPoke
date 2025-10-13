@@ -4,7 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 // Lazy load components
 const Index = lazy(() => import("./pages/Index"));
@@ -17,6 +18,39 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Card Preloader component - handles initializing session cards
+const CardPreloader = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  
+  useEffect(() => {
+    // Initialize session cards when app loads
+    const initializeCards = async () => {
+      setIsLoading(true);
+      try {
+        // Dynamic import to avoid issues with server-side rendering
+        const { initializeSessionCards, getSessionStats } = await import('@/services/sessionCardManager');
+        
+        // Check if we have cards in session already
+        const stats = getSessionStats();
+        if (stats.totalCards === 0) {
+          toast.info('Downloading cards for offline play...');
+          await initializeSessionCards();
+        } else {
+          console.log(`Using ${stats.availableCards} available cards from session`);
+        }
+      } catch (error) {
+        console.error('Failed to initialize session cards:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    initializeCards();
+  }, []);
+  
+  return null; // This component doesn't render anything visible
+};
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -26,6 +60,8 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          {/* Card preloader runs as soon as the app mounts */}
+          <CardPreloader />
           <Suspense fallback={<LoadingSpinner />}>
             <Routes>
               <Route path="/" element={<Index />} />

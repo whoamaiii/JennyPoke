@@ -63,10 +63,6 @@ const Index = () => {
   const handleOpenPack = async () => {
     if (isLoading || isTestingApi) return; // prevent multiple clicks and simultaneous operations
     
-    // Create new abort controller for this request
-    const controller = new AbortController();
-    setAbortController(controller);
-    
     setIsLoading(true);
     setError(null); // Clear any previous errors
 
@@ -74,27 +70,46 @@ const Index = () => {
     const startTime = Date.now();
 
     try {
-      const cards = await openPack(controller.signal);
+      // Import sessionCardManager dynamically to avoid issues with SSR
+      const { 
+        getRandomPack, 
+        convertSessionCardToCardData, 
+        markCardsAsShown,
+        checkNeedRefresh,
+        refreshSessionCards
+      } = await import('@/services/sessionCardManager');
+      
+      // Get cards from session storage instead of API
+      const { cards: sessionCards, needsRefresh } = getRandomPack();
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.log(`✅ Pack opened successfully in ${duration}s with ${cards.length} cards`);
-
-      if (cards.length === 0) {
-        throw new PokemonTCGError('No cards available. Please try again later.', 'NO_DATA');
+      
+      if (sessionCards.length === 0) {
+        throw new PokemonTCGError('No cards available. Please wait for download to complete.', 'NO_DATA');
       }
+      
+      // Convert session cards to card data format
+      const cards = convertSessionCardToCardData(sessionCards);
+      console.log(`✅ Pack opened from session in ${duration}s with ${cards.length} cards`);
+      
+      // Mark these cards as shown
+      markCardsAsShown(sessionCards.map(card => card.id));
+      
+      // Trigger background refresh if needed
+      if (needsRefresh && !isTestingApi) {
+        console.log('🔄 Background refresh triggered - downloading more cards');
+        refreshSessionCards().catch(err => 
+          console.error('Background card refresh failed:', err)
+        );
+      }
+      
       setCurrentPack(cards);
       setView('opening');
       toast.success('Pack opened! Swipe through your cards!');
     } catch (error) {
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-      
-      // Handle request cancellation
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log(`🛑 Pack opening cancelled after ${duration}s (user navigated away)`);
-        return; // Don't show error for cancelled requests
-      }
-      
       console.error(`❌ Pack opening failed after ${duration}s:`, error);
 
+      // Create standardized error
       const pokemonError = error instanceof PokemonTCGError ? error :
         new PokemonTCGError('An unexpected error occurred. Please try again.', 'UNKNOWN', error);
 
@@ -102,26 +117,25 @@ const Index = () => {
 
       // Show appropriate toast message based on error type
       switch (pokemonError.code) {
-        case 'TIMEOUT':
-          toast.error('Request timed out after 7 minutes. The API may be slow - please try again.');
-          break;
-        case 'NETWORK':
-          toast.error('Connection failed. Please check your internet and try again.');
-          break;
-        case 'API_ERROR':
-          toast.error(pokemonError.message);
-          break;
         case 'NO_DATA':
-          toast.error('No cards available right now. Please try again later.');
+          toast.error('No cards available right now. Still downloading cards - please try again in a moment.');
+          
+          // Try to refresh cards in background
+          try {
+            const { refreshSessionCards } = await import('@/services/sessionCardManager');
+            refreshSessionCards();
+          } catch (refreshError) {
+            console.error('Failed to trigger background refresh:', refreshError);
+          }
           break;
         default:
-          toast.error('Something went wrong. Please try again.');
+          toast.error('Something went wrong loading cards. Please try again.');
       }
 
       console.error('Pack opening error:', pokemonError);
     } finally {
       setIsLoading(false);
-      setAbortController(null); // Clean up abort controller
+      setAbortController(null); // Clean up abort controller even though we're not using it
     }
   };
 
