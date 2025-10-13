@@ -13,8 +13,9 @@ import { downloadAndCompressImage, createImagePlaceholder } from '@/lib/imageUti
 // Constants
 const SESSION_STORAGE_KEY = 'pokemon_session_cards';
 const CONCURRENT_DOWNLOADS = 4; // Number of concurrent image downloads (reduced for stability)
-const CARDS_TO_LOAD = 20; // Maximum number of cards to keep in session storage (reduced for stability)
+const CARDS_TO_LOAD = 32; // Maximum number of cards to keep in session storage
 const REFRESH_THRESHOLD = 16; // Number of available cards before triggering a refresh
+const INITIAL_LOAD = 24; // Number of cards to load initially
 const PACK_SIZE = 8; // Number of cards in a pack
 const MAX_RETRY_ATTEMPTS = 3; // Maximum retries for failed downloads
 const DOWNLOAD_TIMEOUT = 10000; // 10 second timeout per download
@@ -39,8 +40,8 @@ export async function initializeSessionCards(): Promise<boolean> {
       return true;
     }
     
-    // Start downloading cards
-    return await refreshSessionCards();
+    // Start downloading cards (initial load)
+    return await refreshSessionCards(true);
   } catch (error) {
     console.error('Error initializing session cards:', error);
     toast.error('Failed to initialize card data.');
@@ -288,7 +289,7 @@ async function downloadCardBatch(cards: CardCSVRow[]): Promise<SessionCard[]> {
 /**
  * Download a new batch of cards and add to session
  */
-export async function refreshSessionCards(): Promise<boolean> {
+export async function refreshSessionCards(isInitialLoad = false): Promise<boolean> {
   if (isDownloading) {
     console.log('[SessionCardManager] Already downloading cards, skipping duplicate request');
     toast.info('Already downloading cards. Please wait...');
@@ -316,9 +317,18 @@ export async function refreshSessionCards(): Promise<boolean> {
       return true;
     }
     
-    // Download up to the available slots (max 32 total)
-    const cardsToDownload = Math.min(availableSlots, CARDS_TO_LOAD);
-    console.log(`[SessionCardManager] Requesting ${cardsToDownload} random cards from CSV...`);
+    // Download in multiples of 8 (pack size) to stay within available slots
+    const maxCardsToDownload = isInitialLoad ? INITIAL_LOAD : Math.min(availableSlots, CARDS_TO_LOAD);
+    const cardsToDownload = Math.floor(maxCardsToDownload / PACK_SIZE) * PACK_SIZE;
+    
+    if (cardsToDownload === 0) {
+      console.log('[SessionCardManager] Not enough space to download a full pack (8 cards)');
+      sessionState.isLoading = false;
+      saveSessionState(sessionState);
+      return true;
+    }
+    
+    console.log(`[SessionCardManager] Requesting ${cardsToDownload} random cards from CSV (in multiples of ${PACK_SIZE})...`);
     const randomCards = await getRandomPendingCards(cardsToDownload);
     
     console.log(`[SessionCardManager] Found ${randomCards.length} cards to download`);
