@@ -8,13 +8,16 @@
 import { CardCSVRow, SessionCard, SessionCardState } from '@/types/pokemon';
 import { getRandomPendingCards } from './csvManager';
 import { toast } from 'sonner';
+import { downloadAndCompressImage, createImagePlaceholder } from '@/lib/imageUtils';
 
 // Constants
 const SESSION_STORAGE_KEY = 'pokemon_session_cards';
-const CONCURRENT_DOWNLOADS = 8; // Number of concurrent image downloads
-const CARDS_TO_LOAD = 100; // Number of cards to load into session
-const REFRESH_THRESHOLD = 50; // Number of shown cards before triggering a refresh
+const CONCURRENT_DOWNLOADS = 4; // Number of concurrent image downloads (reduced for stability)
+const CARDS_TO_LOAD = 32; // Maximum number of cards to keep in session storage
+const REFRESH_THRESHOLD = 16; // Number of available cards before triggering a refresh
 const PACK_SIZE = 8; // Number of cards in a pack
+const MAX_RETRY_ATTEMPTS = 3; // Maximum retries for failed downloads
+const DOWNLOAD_TIMEOUT = 10000; // 10 second timeout per download
 
 // State management
 let isInitialized = false;
@@ -76,80 +79,153 @@ function saveSessionState(state: SessionCardState): void {
   } catch (error) {
     console.error('Error saving to session storage:', error);
     
-    // If storage is full, try to remove image data from older cards
+    // If storage is full, aggressively reduce cards
     if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      toast.error('Session storage is full. Some cards may not be available offline.');
+      console.warn('[SessionCardManager] Quota exceeded! Attempting to free space...');
+      toast.error('Session storage full. Reducing card count...');
       
       try {
-        const currentState = getSessionState();
-        // Keep shown cards but remove their image data to free up space
-        currentState.cards.forEach(card => {
-          if (currentState.shownCardIds.includes(card.id)) {
-            card.imageData = ''; // Remove image data
-          }
-        });
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(currentState));
+        // Strategy 1: Remove cards that have already been shown
+        let reducedState = { ...state };
+        reducedState.cards = state.cards.filter(card => !state.shownCardIds.includes(card.id));
+        
+        // If still have cards, try to save
+        if (reducedState.cards.length > 0) {
+          console.log(`[SessionCardManager] Removed shown cards, now have ${reducedState.cards.length} cards`);
+          sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
+          return;
+        }
+        
+        // Strategy 2: Keep only half the cards
+        reducedState.cards = state.cards.slice(0, Math.floor(state.cards.length / 2));
+        console.log(`[SessionCardManager] Keeping only ${reducedState.cards.length} cards`);
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
       } catch (cleanupError) {
-        console.error('Failed to clean up session storage:', cleanupError);
+        console.error('[SessionCardManager] Failed to clean up session storage:', cleanupError);
+        // Last resort: clear everything
+        try {
+          sessionStorage.removeItem(SESSION_STORAGE_KEY);
+          console.log('[SessionCardManager] Cleared all session storage as last resort');
+        } catch (e) {
+          console.error('[SessionCardManager] Could not clear session storage:', e);
+        }
       }
     }
   }
 }
 
 /**
- * Download a single card image and convert to data URL
+ * Fetch with timeout
  */
-async function downloadCardImage(card: CardCSVRow): Promise<SessionCard | null> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
   try {
-    console.log(`[SessionCardManager] Downloading card image: ${card.set_id}-${card.card_number} from ${card.image_url}`);
-    
-    // Handle CORS issues by using a proxy if needed
-    const useProxy = true; // Set to false in production if your API has proper CORS headers
-    // Using corsproxy.io instead of cors-anywhere as it's more reliable
-    const proxyUrl = 'https://corsproxy.io/?';
-    console.log(`[DEBUG] Attempting to download image from ${card.image_url}`);
-    
-    const imageUrl = useProxy ? `${proxyUrl}${encodeURIComponent(card.image_url)}` : card.image_url;
-    console.log(`[DEBUG] Using proxy URL: ${imageUrl}`);
-    
-    const response = await fetch(imageUrl, { 
-      mode: 'cors',
-      headers: {
-        'Accept': 'image/png,image/jpeg,image/webp,image/*'
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
+/**
+ * Try to download image with multiple fallback strategies
+ */
+async function tryDownloadImage(imageUrl: string): Promise<Blob | null> {
+  const strategies = [
+    // Strategy 1: Try direct fetch (no proxy) - Pokemon TCG API may support CORS now
+    { name: 'Direct', url: imageUrl },
+    // Strategy 2: Try with corsproxy.io
+    { name: 'corsproxy.io', url: `https://corsproxy.io/?${encodeURIComponent(imageUrl)}` },
+    // Strategy 3: Try with allorigins.win
+    { name: 'allorigins.win', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}` },
+    // Strategy 4: Try standard resolution if hi-res fails
+    { name: 'Standard res', url: imageUrl.replace('_hires', '') },
+  ];
+  
+  for (const strategy of strategies) {
+    try {
+      console.log(`[SessionCardManager] Trying ${strategy.name}: ${strategy.url}`);
+      
+      const response = await fetchWithTimeout(strategy.url, {
+        mode: 'cors',
+        headers: {
+          'Accept': 'image/png,image/jpeg,image/webp,image/*'
+        }
+      }, DOWNLOAD_TIMEOUT);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        if (blob.size > 0) {
+          console.log(`[SessionCardManager] ✓ Success with ${strategy.name}, size: ${blob.size} bytes`);
+          return blob;
+        }
       }
-    });
-    
-    if (!response.ok) {
-      console.error(`[SessionCardManager] Failed to download image: ${response.status} ${response.statusText}`);
-      throw new Error(`Failed to download image: ${response.status}`);
+      console.log(`[SessionCardManager] ✗ ${strategy.name} failed: ${response.status}`);
+    } catch (error: any) {
+      console.log(`[SessionCardManager] ✗ ${strategy.name} error: ${error.message}`);
     }
+  }
+  
+  return null;
+}
+
+/**
+ * Download a single card image and convert to data URL with retries
+ */
+async function downloadCardImage(card: CardCSVRow, retryCount = 0): Promise<SessionCard | null> {
+  try {
+    console.log(`[SessionCardManager] Downloading and compressing card image: ${card.set_id}-${card.card_number} from ${card.image_url}`);
     
-    const blob = await response.blob();
-    console.log(`[SessionCardManager] Downloaded image, size: ${blob.size} bytes`);
-    
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        console.log(`[SessionCardManager] Image converted to data URL successfully`);
-        resolve({
-          id: `${card.set_id}-${card.card_number}`,
-          set_id: card.set_id,
-          set_name: card.set_name,
-          card_number: card.card_number,
-          image_url: card.image_url,
-          imageData: reader.result as string,
-          filename: card.filename
-        });
-      };
-      reader.onerror = () => {
-        console.error(`[SessionCardManager] Error reading image data for ${card.set_id}-${card.card_number}`);
-        resolve(null);
-      };
-      reader.readAsDataURL(blob);
+    // Use the new image compression utility
+    const compressedResult = await downloadAndCompressImage(card.image_url, {
+      maxWidth: 800,
+      maxHeight: 600,
+      quality: 0.8,
+      format: 'webp'
     });
+    
+    console.log(`[SessionCardManager] ✓ Card ${card.set_id}-${card.card_number} compressed: ${compressedResult.originalSize} → ${compressedResult.compressedSize} bytes (${compressedResult.compressionRatio.toFixed(1)}% reduction)`);
+    
+    return {
+      id: `${card.set_id}-${card.card_number}`,
+      set_id: card.set_id,
+      set_name: card.set_name,
+      card_number: card.card_number,
+      image_url: card.image_url,
+      imageData: compressedResult.dataUrl,
+      filename: card.filename
+    };
   } catch (error) {
     console.error(`[SessionCardManager] Error downloading card ${card.set_id}-${card.card_number}:`, error);
-    return null;
+    
+    // Retry with exponential backoff if we haven't exceeded max retries
+    if (retryCount < MAX_RETRY_ATTEMPTS) {
+      const delay = Math.pow(2, retryCount) * 1000;
+      console.log(`[SessionCardManager] Retry ${retryCount + 1}/${MAX_RETRY_ATTEMPTS} after error, waiting ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return downloadCardImage(card, retryCount + 1);
+    }
+    
+    // If all retries failed, create a placeholder
+    console.warn(`[SessionCardManager] Creating placeholder for failed card ${card.set_id}-${card.card_number}`);
+    const placeholder = createImagePlaceholder(400, 600);
+    
+    return {
+      id: `${card.set_id}-${card.card_number}`,
+      set_id: card.set_id,
+      set_name: card.set_name,
+      card_number: card.card_number,
+      image_url: card.image_url,
+      imageData: placeholder,
+      filename: card.filename
+    };
   }
 }
 
@@ -209,14 +285,27 @@ export async function refreshSessionCards(): Promise<boolean> {
     sessionState.isLoading = true;
     saveSessionState(sessionState);
     
-    // Get random cards to download - use a smaller batch first to ensure faster initial loading
-    const initialBatchSize = 20; // Start with a smaller batch for quick success
-    console.log(`[SessionCardManager] Requesting ${initialBatchSize} random cards from CSV...`);
-    const randomCards = await getRandomPendingCards(initialBatchSize);
+    // Calculate how many cards we can download to stay within limit
+    const currentCardCount = sessionState.cards.length;
+    const availableSlots = Math.max(0, CARDS_TO_LOAD - currentCardCount);
+    
+    console.log(`[SessionCardManager] Current cards: ${currentCardCount}, Max: ${CARDS_TO_LOAD}, Available slots: ${availableSlots}`);
+    
+    if (availableSlots === 0) {
+      console.log('[SessionCardManager] Already at maximum card capacity');
+      sessionState.isLoading = false;
+      saveSessionState(sessionState);
+      return true;
+    }
+    
+    // Download up to the available slots (max 32 total)
+    const cardsToDownload = Math.min(availableSlots, CARDS_TO_LOAD);
+    console.log(`[SessionCardManager] Requesting ${cardsToDownload} random cards from CSV...`);
+    const randomCards = await getRandomPendingCards(cardsToDownload);
     
     console.log(`[SessionCardManager] Found ${randomCards.length} cards to download`);
     if (randomCards.length > 0) {
-      console.log('[SessionCardManager] Cards to download:', randomCards.map(c => ({
+      console.log('[SessionCardManager] First 3 cards to download:', randomCards.slice(0, 3).map(c => ({
         id: `${c.set_id}-${c.card_number}`,
         set: c.set_name,
         url: c.image_url
@@ -226,46 +315,48 @@ export async function refreshSessionCards(): Promise<boolean> {
     if (randomCards.length === 0) {
       console.error('[SessionCardManager] No cards available for download');
       toast.error('No cards available for download. Check if CSV files are correctly loaded.');
+      sessionState.isLoading = false;
+      saveSessionState(sessionState);
       return false;
     }
     
-    toast.info(`Downloading ${Math.min(randomCards.length, initialBatchSize)} cards for offline play...`);
+    toast.info(`Downloading ${randomCards.length} cards for offline play...`);
     
-    // Download images in parallel - use a smaller batch first to ensure we get some cards loaded quickly
-    const newSessionCards = await downloadCardBatch(randomCards.slice(0, initialBatchSize));
-    console.log(`[SessionCardManager] Downloaded ${newSessionCards.length} cards out of ${randomCards.length} attempted`);
+    // Download images
+    const newSessionCards = await downloadCardBatch(randomCards);
+    console.log(`[SessionCardManager] Successfully downloaded ${newSessionCards.length} out of ${randomCards.length} attempted`);
     
-    // Update session storage immediately with what we have
-    const updatedState = getSessionState();
-    updatedState.cards = [...newSessionCards, ...updatedState.cards];
-    updatedState.isLoading = false;
-    updatedState.lastLoadTime = Date.now();
-    saveSessionState(updatedState);
-    
-    // Set flag based on successful download of at least some cards
-    isInitialized = newSessionCards.length > 0;
-    
-    // Show success message
-    if (newSessionCards.length > 0) {
-      console.log(`[SessionCardManager] Successfully downloaded ${newSessionCards.length} cards`);
-      toast.success(`Downloaded ${newSessionCards.length} cards successfully!`);
-      
-      // If we got some cards, schedule downloading more in the background after a short delay
-      if (newSessionCards.length > 0 && randomCards.length >= initialBatchSize) {
-        setTimeout(() => {
-          console.log('[SessionCardManager] Scheduling additional card downloads in background');
-          downloadMoreCardsInBackground().catch(err => 
-            console.error('[SessionCardManager] Background download failed:', err)
-          );
-        }, 3000);
-      }
-      
-      return true;
-    } else {
+    if (newSessionCards.length === 0) {
       console.error('[SessionCardManager] Failed to download any cards');
       toast.error('Failed to download any cards. Check network connection and try again.');
+      sessionState.isLoading = false;
+      saveSessionState(sessionState);
       return false;
     }
+    
+    // Update session storage immediately with what we have, enforcing the limit
+    const updatedState = getSessionState();
+    const combinedCards = [...newSessionCards, ...updatedState.cards];
+    // Enforce the maximum limit
+    updatedState.cards = combinedCards.slice(0, CARDS_TO_LOAD);
+    updatedState.isLoading = false;
+    updatedState.lastLoadTime = Date.now();
+    
+    console.log(`[SessionCardManager] Saving ${updatedState.cards.length} cards to session storage...`);
+    saveSessionState(updatedState);
+    
+    // Verify save was successful
+    const verifyState = getSessionState();
+    console.log(`[SessionCardManager] ✓ Verified: ${verifyState.cards.length} cards now in session storage`);
+    
+    // Set flag based on successful download
+    isInitialized = true;
+    
+    // Show success message
+    console.log(`[SessionCardManager] Successfully downloaded and saved ${newSessionCards.length} cards`);
+    toast.success(`Downloaded ${newSessionCards.length} cards successfully!`);
+    
+    return true;
   } catch (error) {
     console.error('Error refreshing session cards:', error);
     toast.error('Failed to download cards.');
@@ -284,6 +375,7 @@ export async function refreshSessionCards(): Promise<boolean> {
 
 /**
  * Download more cards in the background without blocking UI
+ * This function is now disabled to respect the 32 card limit
  */
 async function downloadMoreCardsInBackground(): Promise<boolean> {
   if (isDownloading) {
@@ -291,40 +383,11 @@ async function downloadMoreCardsInBackground(): Promise<boolean> {
     return false;
   }
   
-  console.log('[SessionCardManager] Starting background card download process');
+  console.log('[SessionCardManager] Background download disabled - using 32 card limit');
   
-  try {
-    isDownloading = true;
-    
-    // Use a larger batch for background downloads
-    const backgroundBatchSize = 50;
-    const randomCards = await getRandomPendingCards(backgroundBatchSize);
-    
-    if (randomCards.length === 0) {
-      console.log('[SessionCardManager] No more cards available for background download');
-      return false;
-    }
-    
-    console.log(`[SessionCardManager] Background downloading ${randomCards.length} cards`);
-    
-    // Download images in parallel
-    const newSessionCards = await downloadCardBatch(randomCards.slice(0, backgroundBatchSize));
-    
-    // Update session storage
-    const updatedState = getSessionState();
-    updatedState.cards = [...newSessionCards, ...updatedState.cards];
-    updatedState.lastLoadTime = Date.now();
-    saveSessionState(updatedState);
-    
-    console.log(`[SessionCardManager] Background downloaded ${newSessionCards.length} additional cards`);
-    
-    return newSessionCards.length > 0;
-  } catch (error) {
-    console.error('[SessionCardManager] Error in background card download:', error);
-    return false;
-  } finally {
-    isDownloading = false;
-  }
+  // Background downloads are disabled to prevent exceeding the 32 card limit
+  // The initial download of 32 cards should be sufficient for the pack opening experience
+  return false;
 }
 
 /**

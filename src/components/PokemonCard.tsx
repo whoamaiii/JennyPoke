@@ -3,6 +3,9 @@ import { cn } from '@/lib/utils';
 import cardBackImage from '@/assets/pokemon-card-back.png';
 import { useRef, useState, useEffect } from 'react';
 import gsap from 'gsap';
+import { CardSkeleton } from './CardSkeleton';
+import { preloadImage, createImagePlaceholder } from '@/lib/imageUtils';
+import { getCardDimensions, getImageContainerClasses, getImageClasses } from '@/lib/cardUtils';
 
 // Define the three required sizes: 'grid', 'small', and 'large'
 type CardSize = 'grid' | 'small' | 'large';
@@ -23,24 +26,17 @@ const rarityColors: Record<string, string> = {
   'ultra-rare': 'from-blue-700 via-blue-800 to-blue-900',
 };
 
-// 1. Helper function to get the correct size classes
+// 1. Helper function to get the correct size classes using utility
 const getSizeClasses = (size: CardSize) => {
-  switch (size) {
-    case 'grid':
-      // CUSTOM SIZE: Fixed dimensions for the new desired size
-      return 'w-[245px] h-[335px]';
-    case 'small':
-      return 'w-32 h-40 sm:w-48 sm:h-56';
-    case 'large':
-    default:
-      return 'w-64 h-80 sm:w-80 sm:h-[28rem]';
-  }
+  return getCardDimensions(size).className;
 };
 
 export const PokemonCard = ({ card, className, style, showBack = false, size = 'grid', onClick }: PokemonCardProps) => {
-  const { card: tcgCard, rarity } = card;
-  const elRef = useRef<HTMLDivElement | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const { card: tcgCard, rarity } = card;
+  const elRef = useRef<HTMLDivElement | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [showSkeleton, setShowSkeleton] = useState(true);
   
   // UPDATED LOGIC: Interactive effect is enabled for 'grid' and 'large' sizes.
   // It is only disabled for 'small' and when the card back is showing.
@@ -77,55 +73,96 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
 
   const cardSizeClasses = getSizeClasses(size);
 
-  if (showBack) {
-    return (
-      <div className={cn('relative rounded-2xl overflow-hidden shadow-2xl', cardSizeClasses, className)} style={style}>
-        <img src={cardBackImage} alt="Pokémon Card Back" className="w-full h-full object-cover" />
-      </div>
-    );
-  }
+  if (showBack) {
+    return (
+      <div className={cn('relative rounded-2xl overflow-hidden shadow-2xl', cardSizeClasses, className)} style={style}>
+        <img 
+          src={cardBackImage} 
+          alt="Pokémon Card Back" 
+          className="w-full h-full object-contain bg-card" 
+        />
+      </div>
+    );
+  }
 
-  const imgSmall = tcgCard.images.small;
-  const imgLarge = tcgCard.images.large || imgSmall;
-  
-  // UPDATED LOGIC: Only use small image for 'small' size.
-  // 'grid' and 'large' now prioritize the large image for high quality.
-  const imgSrc = (size === 'small') ? imgSmall || imgLarge : imgLarge;
+  const imgSmall = tcgCard.images.small;
+  const imgLarge = tcgCard.images.large || imgSmall;
+  
+  // UPDATED LOGIC: Only use small image for 'small' size.
+  // 'grid' and 'large' now prioritize the large image for high quality.
+  const imgSrc = (size === 'small') ? imgSmall || imgLarge : imgLarge;
 
-  return (
-    <div
-      ref={elRef}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      className={cn(
-        'relative rounded-2xl overflow-hidden shadow-2xl bg-card transform will-change-transform',
-        'transition-transform',
-        cardSizeClasses, // Apply the dynamically calculated size classes
-        className
-      )}
-      style={{ perspective: '1000px', ...(style || {}) }}
-    >
-      <div className="w-full h-full rounded-xl bg-card overflow-hidden relative">
-        {/* low-res placeholder underneath (blurred) - Now enabled for 'grid' and 'large' */}
-        {imgSmall && imgLarge && imgSmall !== imgLarge && size !== 'small' && (
-          <img
-            src={imgSmall}
-            aria-hidden
-            className={cn('absolute inset-0 w-full h-full object-cover transition-opacity duration-500', loaded ? 'opacity-0' : 'opacity-100')}
-          />
-        )}
+  // Preload image with progress tracking
+  useEffect(() => {
+    if (!imgSrc || showBack) return;
 
-        <img
-          src={imgSrc}
-          alt={tcgCard.name}
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
-          className={cn('relative w-full h-full object-cover transition-filter duration-500', loaded ? 'filter-none' : 'blur-sm')}
-        />
-      </div>
-    </div>
-  );
+    setShowSkeleton(true);
+    setLoadingProgress(0);
+    setLoaded(false);
+
+    preloadImage(imgSrc, (progress) => {
+      setLoadingProgress(progress);
+    })
+      .then(() => {
+        setLoaded(true);
+        setShowSkeleton(false);
+      })
+      .catch((error) => {
+        console.error('Failed to load card image:', error);
+        setShowSkeleton(false);
+        setLoaded(true); // Show the image anyway, even if preload failed
+      });
+  }, [imgSrc, showBack]);
+
+  // Show skeleton while loading
+  if (showSkeleton) {
+    return <CardSkeleton size={size} className={className} />;
+  }
+
+  return (
+    <div
+      ref={elRef}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      className={cn(
+        'relative rounded-2xl overflow-hidden shadow-2xl bg-card transform will-change-transform',
+        'transition-transform',
+        cardSizeClasses, // Apply the dynamically calculated size classes
+        className
+      )}
+      style={{ perspective: '1000px', ...(style || {}) }}
+    >
+      <div className={cn(getImageContainerClasses(), 'rounded-xl overflow-hidden relative')}>
+        {/* Progress indicator */}
+        {!loaded && (
+          <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center z-10">
+            <div className="text-center">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground">{Math.round(loadingProgress)}%</p>
+            </div>
+          </div>
+        )}
+
+        {/* low-res placeholder underneath (blurred) - Now enabled for 'grid' and 'large' */}
+        {imgSmall && imgLarge && imgSmall !== imgLarge && size !== 'small' && (
+          <img
+            src={imgSmall}
+            aria-hidden
+            className={cn('absolute inset-0', getImageClasses(), 'transition-opacity duration-500', loaded ? 'opacity-0' : 'opacity-100')}
+          />
+        )}
+
+        <img
+          src={imgSrc}
+          alt={tcgCard.name}
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+          className={cn(getImageClasses(), 'transition-all duration-500', loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105')}
+        />
+      </div>
+    </div>
+  );
 };
 
 export default PokemonCard;

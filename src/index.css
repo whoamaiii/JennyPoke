@@ -109,3 +109,34 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+  
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+  
+  /* Ensure card aspect ratio is preserved */
+  .card-container {
+    aspect-ratio: 2.5 / 3.5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .card-image {
+    object-fit: contain;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+  }
+}

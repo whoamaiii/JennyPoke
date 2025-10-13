@@ -1,15 +1,66 @@
 {
   "name": "Pokémon Pack Opener",
   "short_name": "PokéPacks",
-  "start_url": ".",
+  "description": "Experience the thrill of opening Pokémon card packs with stunning animations and intuitive swipe gestures!",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#f8fafc",
   "theme_color": "#0ea5e9",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["games", "entertainment"],
   "icons": [
     {
       "src": "/favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
+    },
+    {
+      "src": "/pokeball.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open Pack",
+      "short_name": "Open Pack",
+      "description": "Open a new Pokémon card pack",
+      "url": "/?action=open-pack",
+      "icons": [
+        {
+          "src": "/pokeball.svg",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "View Collection",
+      "short_name": "Collection",
+      "description": "View your card collection",
+      "url": "/?action=collection",
+      "icons": [
+        {
+          "src": "/pokeball.svg",
+          "sizes": "96x96"
+        }
+      ]
     }
   ]
 }

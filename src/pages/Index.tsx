@@ -29,6 +29,8 @@ const Index = () => {
   const [helpOpen, setHelpOpen] = useState(false);
   const [isTestingApi, setIsTestingApi] = useState(false);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [isInitialDownloadComplete, setIsInitialDownloadComplete] = useState(false);
+  const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
 
   useEffect(() => {
     if (!viewRootRef.current) return;
@@ -60,11 +62,58 @@ const Index = () => {
     };
   }, [abortController]);
 
+  // Check initial download status on mount
+  useEffect(() => {
+    const checkInitialDownloadStatus = async () => {
+      try {
+        const { getSessionStats } = await import('@/services/sessionCardManager');
+        const stats = getSessionStats();
+        
+        // If we have cards available, initial download is complete
+        if (stats.totalCards > 0) {
+          setIsInitialDownloadComplete(true);
+          console.log('[Index] Initial download already complete, cards available:', stats.totalCards);
+        } else {
+          // Wait for the CardPreloader to complete its download
+          console.log('[Index] Waiting for initial download to complete...');
+          toast.info('Preparing cards for offline play...');
+          
+          // Check periodically until cards are available
+          const checkInterval = setInterval(async () => {
+            const currentStats = getSessionStats();
+            if (currentStats.totalCards > 0) {
+              setIsInitialDownloadComplete(true);
+              clearInterval(checkInterval);
+              console.log('[Index] Initial download completed, cards available:', currentStats.totalCards);
+              toast.success('Cards ready! You can now open packs.');
+            }
+          }, 1000);
+          
+          // Clear interval after 30 seconds to avoid infinite checking
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            if (!isInitialDownloadComplete) {
+              console.warn('[Index] Initial download timeout, allowing pack opening anyway');
+              setIsInitialDownloadComplete(true);
+            }
+          }, 30000);
+        }
+      } catch (error) {
+        console.error('[Index] Error checking initial download status:', error);
+        // Allow pack opening even if check fails
+        setIsInitialDownloadComplete(true);
+      }
+    };
+    
+    checkInitialDownloadStatus();
+  }, []);
+
   const handleOpenPack = async () => {
-    if (isLoading || isTestingApi) return; // prevent multiple clicks and simultaneous operations
+    if (isLoading || isTestingApi || !isInitialDownloadComplete) return; // prevent multiple clicks and simultaneous operations
     
     setIsLoading(true);
     setError(null); // Clear any previous errors
+    toast.info('Fetching cards from API...');
 
     console.log('🎯 Starting pack opening process...');
     const startTime = Date.now();
@@ -146,9 +195,19 @@ const Index = () => {
       if (needsRefresh && !isTestingApi) {
         console.log('🔄 Background refresh triggered - downloading more cards');
         toast.info('Downloading more cards in background...');
-        refreshSessionCards().catch(err => 
-          console.error('Background card refresh failed:', err)
-        );
+        setIsBackgroundLoading(true);
+        refreshSessionCards()
+          .then(() => {
+            console.log('✅ Background refresh completed');
+            toast.success('More cards downloaded successfully!');
+          })
+          .catch(err => {
+            console.error('Background card refresh failed:', err);
+            toast.error('Background download failed, but you can still open packs');
+          })
+          .finally(() => {
+            setIsBackgroundLoading(false);
+          });
       }
       
       setCurrentPack(cards);
@@ -266,12 +325,18 @@ const Index = () => {
               
               <Button
                 onClick={handleOpenPack}
-                disabled={isLoading || isTestingApi}
+                disabled={isLoading || isTestingApi || !isInitialDownloadComplete || isBackgroundLoading}
                 variant="hero"
                 size="lg"
                 className="text-lg px-8 py-6"
+                aria-label={!isInitialDownloadComplete ? "Preparing cards for pack opening" : isLoading ? "Opening pack, please wait" : "Open a new Pokémon card pack"}
               >
-                {isLoading ? (
+                {!isInitialDownloadComplete ? (
+                  <>
+                    <Sparkles className="w-5 h-5 animate-spin" />
+                    Preparing Cards...
+                  </>
+                ) : isLoading ? (
                   <>
                     <Sparkles className="w-5 h-5 animate-spin" />
                     Opening Pack...
@@ -286,8 +351,9 @@ const Index = () => {
 
               <Button
                 onClick={async () => {
-                  if (isTestingApi || isLoading) return; // prevent multiple clicks and simultaneous operations
+                  if (isTestingApi || isLoading || !isInitialDownloadComplete || isBackgroundLoading) return; // prevent multiple clicks and simultaneous operations
                   setIsTestingApi(true);
+                  toast.info('Testing API key...');
                   try {
                     const success = await testApiKey();
                     if (success) {
@@ -301,48 +367,25 @@ const Index = () => {
                     setIsTestingApi(false);
                   }
                 }}
-                disabled={isTestingApi || isLoading}
+                disabled={isTestingApi || isLoading || !isInitialDownloadComplete || isBackgroundLoading}
                 variant="outline"
                 size="sm"
                 className="mt-4 text-sm"
+                aria-label={!isInitialDownloadComplete ? "Preparing cards, API test unavailable" : isTestingApi ? "Testing API key, please wait" : "Test API key connection"}
               >
-                {isTestingApi ? 'Testing...' : 'Test API Key'}
+                {!isInitialDownloadComplete ? 'Preparing...' : isTestingApi ? 'Testing...' : 'Test API Key'}
               </Button>
 
-              {(isLoading || isTestingApi) && (
-                <div className="mt-4 p-4 bg-card/50 backdrop-blur border border-border/50 rounded-lg max-w-md">
-                  <div className="flex justify-center items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                    <p className="text-sm text-center font-medium">
-                      {isLoading ? 'Fetching cards from API...' : 'Testing API key...'}
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {isLoading 
-                      ? 'This may take up to 7 minutes due to API response times. Please wait...'
-                      : 'Checking API key configuration...'
-                    }
-                  </p>
-                </div>
-              )}
 
               {error && (
-                <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg max-w-md">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-destructive rounded-full"></div>
-                    <p className="text-sm font-medium text-destructive">Connection Error</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {error.message}
-                  </p>
+                <div className="mt-6 flex justify-center">
                   <Button
                     onClick={handleRetry}
-                    disabled={isLoading || isTestingApi}
+                    disabled={isLoading || isTestingApi || !isInitialDownloadComplete || isBackgroundLoading}
                     variant="outline"
                     size="sm"
-                    className="w-full"
                   >
-                    {isLoading ? 'Retrying...' : 'Try Again'}
+                    {!isInitialDownloadComplete ? 'Preparing...' : isLoading ? 'Retrying...' : 'Try Again'}
                   </Button>
                 </div>
               )}

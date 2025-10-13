@@ -1,10 +1,13 @@
 import { CardData, PokemonTCGCard } from '@/types/pokemon';
 import { PokemonCard } from './PokemonCard';
 import { Button } from './ui/button';
-import { Heart, Trash, Download, Loader2 } from 'lucide-react';
+import { Heart, Trash, Download, Loader2, Search, Filter } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
+import { CollectionStats } from './CollectionStats';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 function exportFavoritesAsCSV(favorites: CardData[]) {
   if (!favorites || favorites.length === 0) return;
@@ -42,6 +45,37 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
   const [selected, setSelected] = useState<CardData | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [selectedDetails, setSelectedDetails] = useState<PokemonTCGCard | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [rarityFilter, setRarityFilter] = useState<string>('all');
+  const [setFilter, setSetFilter] = useState<string>('all');
+
+  // Filter and search logic
+  const filteredFavorites = useMemo(() => {
+    return favorites.filter((card) => {
+      const matchesSearch = searchQuery === '' || 
+        card.card.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        card.card.set?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesRarity = rarityFilter === 'all' || 
+        (card.rarity?.toLowerCase() === rarityFilter.toLowerCase());
+      
+      const matchesSet = setFilter === 'all' || 
+        card.card.set?.name === setFilter;
+      
+      return matchesSearch && matchesRarity && matchesSet;
+    });
+  }, [favorites, searchQuery, rarityFilter, setFilter]);
+
+  // Get unique sets and rarities for filters
+  const uniqueSets = useMemo(() => {
+    const sets = [...new Set(favorites.map(card => card.card.set?.name).filter(Boolean))];
+    return sets.sort();
+  }, [favorites]);
+
+  const uniqueRarities = useMemo(() => {
+    const rarities = [...new Set(favorites.map(card => card.rarity).filter(Boolean))];
+    return rarities.sort();
+  }, [favorites]);
 
   // prefetched images for faster modal open (small set)
   useMemo(() => {
@@ -112,7 +146,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold flex items-center gap-3">
             <Heart className="w-10 h-10 text-pokemon-red fill-pokemon-red" />
-            Faves
+            Collection ({favorites.length})
           </h1>
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={handleExport} variant="outline" size="sm" className="flex items-center gap-1 text-xs">
@@ -126,6 +160,62 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
           </div>
         </div>
 
+        {/* Collection Statistics */}
+        <div className="mb-8">
+          <CollectionStats cards={favorites} />
+        </div>
+
+        {/* Search and Filters */}
+        {favorites.length > 0 && (
+          <div className="mb-6 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search cards by name or set..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Select value={rarityFilter} onValueChange={setRarityFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Rarity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Rarities</SelectItem>
+                    {uniqueRarities.map((rarity) => (
+                      <SelectItem key={rarity} value={rarity}>
+                        {rarity?.charAt(0).toUpperCase() + rarity?.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={setFilter} onValueChange={setSetFilter}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Set" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sets</SelectItem>
+                    {uniqueSets.map((set) => (
+                      <SelectItem key={set} value={set}>
+                        {set}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {searchQuery || rarityFilter !== 'all' || setFilter !== 'all' ? (
+              <div className="text-sm text-muted-foreground">
+                Showing {filteredFavorites.length} of {favorites.length} cards
+              </div>
+            ) : null}
+          </div>
+        )}
+
         {favorites.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-center">
             <div>
@@ -135,7 +225,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-            {favorites.map((card) => (
+            {filteredFavorites.map((card) => (
               <div key={card.id} className="flex flex-col items-center">
                 <div 
                   className="transition-transform hover:scale-105 cursor-pointer" 
@@ -145,10 +235,10 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
                     fetchCardDetails(card); // Fetch details when card is selected
                   }}
                 >
-                  <img 
-                    src={(card as any).imageData || card.card.images.small || card.card.images.large}
-                    alt={card.card.name}
-                    className="w-full max-w-[245px] h-auto object-contain rounded-lg shadow-lg"
+                  <PokemonCard 
+                    card={card} 
+                    size="grid"
+                    className="max-w-[245px]"
                   />
                 </div>
                 <div className="mt-4 text-center w-full max-w-[245px]">
@@ -192,10 +282,10 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
             ) : (
               <div className="flex flex-col md:grid md:grid-cols-2 gap-6">
                 <div className="flex justify-center items-start">
-                  <img 
-                    src={(selected as any).imageData || selected.card.images.large || selected.card.images.small} 
-                    alt={selectedDetails?.name || selected.card.name} 
-                    className="w-full max-w-[245px] h-auto object-contain rounded-lg shadow-lg" 
+                  <PokemonCard 
+                    card={selected} 
+                    size="grid"
+                    className="max-w-[245px]"
                   />
                 </div>
                 <div className="flex flex-col gap-3">

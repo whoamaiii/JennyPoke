@@ -89,15 +89,18 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
       animateSkip();
     }
 
-    const xOffset = direction === 'left' ? -window.innerWidth : window.innerWidth;
-    const rotation = direction === 'left' ? -45 : 45;
+    // Mobile-optimized values
+    const viewportWidth = window.innerWidth;
+    const isMobile = viewportWidth < 768;
+    const xOffset = direction === 'left' ? -viewportWidth : viewportWidth;
+    const rotation = direction === 'left' ? (isMobile ? -30 : -45) : (isMobile ? 30 : 45);
 
     gsap.to(cardRef.current, {
       x: xOffset,
       y: 0, // Ensure consistent exit position
       rotation: rotation,
       opacity: 0,
-      duration: 0.5,
+      duration: isMobile ? 0.3 : 0.5,
       ease: 'power2.in',
       onComplete: () => {
         onSwipe(currentCard.id, isFavorite);
@@ -136,7 +139,8 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
       const deltaX = e.deltaX;
       // Limit vertical movement to prevent cards from appearing at wrong positions
       const deltaY = Math.max(-50, Math.min(50, e.deltaY));
-      const rotation = deltaX / 20;
+      const isMobile = window.innerWidth < 768;
+      const rotation = deltaX / (isMobile ? 15 : 20); // More responsive rotation on mobile
 
       gsap.set(cardRef.current, {
         x: deltaX,
@@ -150,9 +154,14 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
       const deltaX = e.deltaX;
       const velocityX = e.velocityX;
+      const isMobile = window.innerWidth < 768;
+      
+      // Mobile-optimized swipe thresholds
+      const swipeThreshold = isMobile ? 100 : 150;
+      const velocityThreshold = isMobile ? 0.3 : 0.5;
 
       // Check if swipe was strong enough
-      if (Math.abs(deltaX) > 150 || Math.abs(velocityX) > 0.5) {
+      if (Math.abs(deltaX) > swipeThreshold || Math.abs(velocityX) > velocityThreshold) {
         if (deltaX < 0) {
           swipeCard('left');
         } else {
@@ -164,7 +173,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           x: 0,
           y: 0,
           rotation: 0,
-          duration: 0.3,
+          duration: isMobile ? 0.2 : 0.3,
           ease: 'power2.out',
         });
       }
