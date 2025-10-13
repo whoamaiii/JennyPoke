@@ -28,24 +28,47 @@ const CardPreloader = () => {
       setIsLoading(true);
       try {
         // Dynamic import to avoid issues with server-side rendering
-        const { initializeSessionCards, getSessionStats } = await import('@/services/sessionCardManager');
+        const { initializeSessionCards, getSessionStats, refreshSessionCards } = await import('@/services/sessionCardManager');
         
         // Check if we have cards in session already
         const stats = getSessionStats();
-        if (stats.totalCards === 0) {
-          toast.info('Downloading cards for offline play...');
-          await initializeSessionCards();
-        } else {
-          console.log(`Using ${stats.availableCards} available cards from session`);
+        console.log('[CardPreloader] Initial session stats:', stats);
+        
+        console.log('[CardPreloader] Session stats:', stats);
+        
+        // Always try to download cards on startup, even if we have some already
+        console.log('[CardPreloader] Downloading cards now...');
+        toast.info('Downloading cards for offline play...');
+        
+        try {
+          // Force immediate download of cards for session
+          const success = await refreshSessionCards();
+          if (success) {
+            // Check updated stats after download
+            const updatedStats = getSessionStats();
+            console.log('[CardPreloader] Updated session stats after download:', updatedStats);
+            toast.success(`${updatedStats.availableCards} card images ready for use!`);
+          } else {
+            toast.error('Failed to download card images. Pack opening may not work properly.');
+          }
+        } catch (err) {
+          console.error('[CardPreloader] Error downloading cards:', err);
+          toast.error('Error downloading cards. Please try refreshing the page.');
         }
       } catch (error) {
-        console.error('Failed to initialize session cards:', error);
+        console.error('[CardPreloader] Failed to initialize session cards:', error);
+        toast.error('Failed to load cards. Please refresh the page.');
       } finally {
         setIsLoading(false);
       }
     };
     
-    initializeCards();
+    // Run after a small delay to allow the UI to render first
+    const timer = setTimeout(() => {
+      initializeCards();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
   }, []);
   
   return null; // This component doesn't render anything visible

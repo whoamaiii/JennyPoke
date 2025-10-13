@@ -76,16 +76,64 @@ const Index = () => {
         convertSessionCardToCardData, 
         markCardsAsShown,
         checkNeedRefresh,
-        refreshSessionCards
+        refreshSessionCards,
+        getSessionStats
       } = await import('@/services/sessionCardManager');
       
+      // Check if we have cards available
+      const stats = getSessionStats();
+      console.log(`[Index] Opening pack, session has ${stats.totalCards} total cards, ${stats.availableCards} available`);
+      
+      // If no cards at all, start downloading and show appropriate feedback
+      if (stats.totalCards === 0) {
+        console.log('[Index] No cards in session, initiating download');
+        toast.info('No cards loaded yet. Downloading cards now...');
+        
+        // Try to download cards and check if we got any
+        const downloadSuccess = await refreshSessionCards();
+        if (!downloadSuccess) {
+          console.error('[Index] Initial card download failed');
+          throw new PokemonTCGError('Failed to download cards. Please check your network connection and try again.', 'NO_DATA');
+        }
+        
+        // Check if we have cards after download
+        const updatedStats = getSessionStats();
+        if (updatedStats.totalCards === 0) {
+          console.error('[Index] No cards available after download attempt');
+          throw new PokemonTCGError('No cards available after download. Please try again later.', 'NO_DATA');
+        }
+      }
+      
       // Get cards from session storage instead of API
+      console.log('[Index] Requesting random pack from session storage');
       const { cards: sessionCards, needsRefresh } = getRandomPack();
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`[Index] Got ${sessionCards.length} cards from session in ${duration}s`);
       
       if (sessionCards.length === 0) {
-        throw new PokemonTCGError('No cards available. Please wait for download to complete.', 'NO_DATA');
+        console.error('[Index] No session cards returned from getRandomPack');
+        
+        // If cards are still downloading, provide clearer feedback
+        if (stats.isLoading) {
+          console.log('[Index] Cards are still loading, asking user to wait');
+          toast.info('Cards are still downloading. Please try again in a few moments.');
+          throw new PokemonTCGError('Cards are being downloaded. Please wait a moment and try again.', 'NO_DATA');
+        } else {
+          // If not loading but no cards, force a refresh and provide clear guidance
+          console.log('[Index] No cards and not loading, forcing refresh');
+          toast.info('No cards available. Downloading new cards now...');
+          
+          const refreshSuccess = await refreshSessionCards();
+          if (refreshSuccess) {
+            toast.success('Cards downloaded! Try opening a pack now.');
+          }
+          
+          throw new PokemonTCGError('Cards are being downloaded. Please try opening a pack again.', 'NO_DATA');
+        }
       }
+      
+      console.log(`[Index] Successfully retrieved ${sessionCards.length} cards for pack`);
+      
       
       // Convert session cards to card data format
       const cards = convertSessionCardToCardData(sessionCards);
@@ -97,6 +145,7 @@ const Index = () => {
       // Trigger background refresh if needed
       if (needsRefresh && !isTestingApi) {
         console.log('🔄 Background refresh triggered - downloading more cards');
+        toast.info('Downloading more cards in background...');
         refreshSessionCards().catch(err => 
           console.error('Background card refresh failed:', err)
         );

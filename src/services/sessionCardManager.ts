@@ -101,14 +101,36 @@ function saveSessionState(state: SessionCardState): void {
  */
 async function downloadCardImage(card: CardCSVRow): Promise<SessionCard | null> {
   try {
-    const response = await fetch(card.image_url);
-    if (!response.ok) throw new Error(`Failed to download image: ${response.status}`);
+    console.log(`[SessionCardManager] Downloading card image: ${card.set_id}-${card.card_number} from ${card.image_url}`);
+    
+    // Handle CORS issues by using a proxy if needed
+    const useProxy = true; // Set to false in production if your API has proper CORS headers
+    // Using corsproxy.io instead of cors-anywhere as it's more reliable
+    const proxyUrl = 'https://corsproxy.io/?';
+    console.log(`[DEBUG] Attempting to download image from ${card.image_url}`);
+    
+    const imageUrl = useProxy ? `${proxyUrl}${encodeURIComponent(card.image_url)}` : card.image_url;
+    console.log(`[DEBUG] Using proxy URL: ${imageUrl}`);
+    
+    const response = await fetch(imageUrl, { 
+      mode: 'cors',
+      headers: {
+        'Accept': 'image/png,image/jpeg,image/webp,image/*'
+      }
+    });
+    
+    if (!response.ok) {
+      console.error(`[SessionCardManager] Failed to download image: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to download image: ${response.status}`);
+    }
     
     const blob = await response.blob();
+    console.log(`[SessionCardManager] Downloaded image, size: ${blob.size} bytes`);
     
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => {
+        console.log(`[SessionCardManager] Image converted to data URL successfully`);
         resolve({
           id: `${card.set_id}-${card.card_number}`,
           set_id: card.set_id,
@@ -120,13 +142,13 @@ async function downloadCardImage(card: CardCSVRow): Promise<SessionCard | null> 
         });
       };
       reader.onerror = () => {
-        console.error(`Error reading image data for ${card.set_id}-${card.card_number}`);
+        console.error(`[SessionCardManager] Error reading image data for ${card.set_id}-${card.card_number}`);
         resolve(null);
       };
       reader.readAsDataURL(blob);
     });
   } catch (error) {
-    console.error(`Error downloading card ${card.set_id}-${card.card_number}:`, error);
+    console.error(`[SessionCardManager] Error downloading card ${card.set_id}-${card.card_number}:`, error);
     return null;
   }
 }
@@ -174,9 +196,12 @@ async function downloadCardBatch(cards: CardCSVRow[]): Promise<SessionCard[]> {
  */
 export async function refreshSessionCards(): Promise<boolean> {
   if (isDownloading) {
+    console.log('[SessionCardManager] Already downloading cards, skipping duplicate request');
     toast.info('Already downloading cards. Please wait...');
     return false;
   }
+  
+  console.log('[SessionCardManager] Starting card download process');
   
   try {
     isDownloading = true;
@@ -184,19 +209,25 @@ export async function refreshSessionCards(): Promise<boolean> {
     sessionState.isLoading = true;
     saveSessionState(sessionState);
     
-    // Get random cards to download
-    const randomCards = await getRandomPendingCards(CARDS_TO_LOAD);
+    // Get random cards to download - use a smaller batch first to ensure faster initial loading
+    const initialBatchSize = 20; // Start with a smaller batch for quick success
+    const randomCards = await getRandomPendingCards(initialBatchSize);
+    
+    console.log(`[SessionCardManager] Found ${randomCards.length} cards to download`);
+    
     if (randomCards.length === 0) {
-      toast.error('No cards available for download.');
+      console.error('[SessionCardManager] No cards available for download');
+      toast.error('No cards available for download. Check if CSV files are correctly loaded.');
       return false;
     }
     
-    toast.info(`Downloading ${Math.min(randomCards.length, CARDS_TO_LOAD)} cards for offline play...`);
+    toast.info(`Downloading ${Math.min(randomCards.length, initialBatchSize)} cards for offline play...`);
     
-    // Download images in parallel
-    const newSessionCards = await downloadCardBatch(randomCards.slice(0, CARDS_TO_LOAD));
+    // Download images in parallel - use a smaller batch first to ensure we get some cards loaded quickly
+    const newSessionCards = await downloadCardBatch(randomCards.slice(0, initialBatchSize));
+    console.log(`[SessionCardManager] Downloaded ${newSessionCards.length} cards out of ${randomCards.length} attempted`);
     
-    // Update session storage
+    // Update session storage immediately with what we have
     const updatedState = getSessionState();
     updatedState.cards = [...newSessionCards, ...updatedState.cards];
     updatedState.isLoading = false;
@@ -208,10 +239,23 @@ export async function refreshSessionCards(): Promise<boolean> {
     
     // Show success message
     if (newSessionCards.length > 0) {
+      console.log(`[SessionCardManager] Successfully downloaded ${newSessionCards.length} cards`);
       toast.success(`Downloaded ${newSessionCards.length} cards successfully!`);
+      
+      // If we got some cards, schedule downloading more in the background after a short delay
+      if (newSessionCards.length > 0 && randomCards.length >= initialBatchSize) {
+        setTimeout(() => {
+          console.log('[SessionCardManager] Scheduling additional card downloads in background');
+          downloadMoreCardsInBackground().catch(err => 
+            console.error('[SessionCardManager] Background download failed:', err)
+          );
+        }, 3000);
+      }
+      
       return true;
     } else {
-      toast.error('Failed to download any cards.');
+      console.error('[SessionCardManager] Failed to download any cards');
+      toast.error('Failed to download any cards. Check network connection and try again.');
       return false;
     }
   } catch (error) {
@@ -231,6 +275,51 @@ export async function refreshSessionCards(): Promise<boolean> {
 }
 
 /**
+ * Download more cards in the background without blocking UI
+ */
+async function downloadMoreCardsInBackground(): Promise<boolean> {
+  if (isDownloading) {
+    console.log('[SessionCardManager] Already downloading cards, background request skipped');
+    return false;
+  }
+  
+  console.log('[SessionCardManager] Starting background card download process');
+  
+  try {
+    isDownloading = true;
+    
+    // Use a larger batch for background downloads
+    const backgroundBatchSize = 50;
+    const randomCards = await getRandomPendingCards(backgroundBatchSize);
+    
+    if (randomCards.length === 0) {
+      console.log('[SessionCardManager] No more cards available for background download');
+      return false;
+    }
+    
+    console.log(`[SessionCardManager] Background downloading ${randomCards.length} cards`);
+    
+    // Download images in parallel
+    const newSessionCards = await downloadCardBatch(randomCards.slice(0, backgroundBatchSize));
+    
+    // Update session storage
+    const updatedState = getSessionState();
+    updatedState.cards = [...newSessionCards, ...updatedState.cards];
+    updatedState.lastLoadTime = Date.now();
+    saveSessionState(updatedState);
+    
+    console.log(`[SessionCardManager] Background downloaded ${newSessionCards.length} additional cards`);
+    
+    return newSessionCards.length > 0;
+  } catch (error) {
+    console.error('[SessionCardManager] Error in background card download:', error);
+    return false;
+  } finally {
+    isDownloading = false;
+  }
+}
+
+/**
  * Check if we need to refresh cards based on shown count
  */
 export function checkNeedRefresh(): boolean {
@@ -246,13 +335,32 @@ export function checkNeedRefresh(): boolean {
  */
 export function getRandomPack(): { cards: SessionCard[], needsRefresh: boolean } {
   const sessionState = getSessionState();
+  
+  console.log(`[SessionCardManager] Getting random pack from ${sessionState.cards.length} total cards`);
+  console.log(`[SessionCardManager] ${sessionState.shownCardIds.length} cards already shown`);
+  
+  // Check if we have any cards at all first
+  if (sessionState.cards.length === 0) {
+    console.log('[SessionCardManager] No cards in session yet!');
+    // Trigger a download if not already happening
+    if (!isDownloading && !sessionState.isLoading) {
+      refreshSessionCards();
+    }
+    return { cards: [], needsRefresh: true };
+  }
+  
+  // Filter to cards that haven't been shown yet
   const availableCards = sessionState.cards.filter(card => !sessionState.shownCardIds.includes(card.id));
+  console.log(`[SessionCardManager] ${availableCards.length} available cards after filtering shown cards`);
+  
+  // If we've shown all cards, just use any cards (temporary solution)
+  const cardsToUse = availableCards.length > 0 ? availableCards : sessionState.cards;
   
   // Check if we need a refresh based on threshold
   const needsRefresh = availableCards.length <= REFRESH_THRESHOLD;
   
   // Randomize available cards
-  const shuffledCards = [...availableCards].sort(() => Math.random() - 0.5);
+  const shuffledCards = [...cardsToUse].sort(() => Math.random() - 0.5);
   
   // Take at most PACK_SIZE cards
   const packCards = shuffledCards.slice(0, PACK_SIZE);
@@ -267,6 +375,7 @@ export function getRandomPack(): { cards: SessionCard[], needsRefresh: boolean }
     }
   }
   
+  console.log(`[SessionCardManager] Returning ${packCards.length} cards for pack`);
   return { cards: packCards, needsRefresh };
 }
 
@@ -294,13 +403,23 @@ export function markCardsAsShown(cardIds: string[]): void {
  * Convert session cards to format needed by pack opener
  */
 export function convertSessionCardToCardData(sessionCards: SessionCard[]): any[] {
+  console.log(`[SessionCardManager] Converting ${sessionCards.length} session cards to CardData format`);
+  
   return sessionCards.map(sessionCard => {
+    // Ensure we have valid image data
+    if (!sessionCard.imageData) {
+      console.warn(`[SessionCardManager] Card ${sessionCard.id} has no imageData!`);
+    }
+    
+    // Create a card name based on set and number
+    const cardName = `${sessionCard.set_name} #${sessionCard.card_number}`;
+    
     // Create a basic card object that matches the expected format
     return {
       id: sessionCard.id,
       card: {
         id: sessionCard.id,
-        name: `Card ${sessionCard.card_number}`,  // Placeholder until API call
+        name: cardName,
         set: {
           id: sessionCard.set_id,
           name: sessionCard.set_name
@@ -308,8 +427,8 @@ export function convertSessionCardToCardData(sessionCards: SessionCard[]): any[]
         number: sessionCard.card_number,
         rarity: "Unknown",  // Placeholder until API call
         images: {
-          small: sessionCard.image_url,
-          large: sessionCard.image_url
+          small: sessionCard.imageData || sessionCard.image_url,
+          large: sessionCard.imageData || sessionCard.image_url
         },
         // Placeholder data - will be filled in by API call when user views card
         supertype: "Pokémon",
@@ -318,9 +437,11 @@ export function convertSessionCardToCardData(sessionCards: SessionCard[]): any[]
         attacks: []
       },
       rarity: 'common',  // Default rarity until API call
-      // Add a special flag to indicate this is a session card
+      
+      // Add special properties for session cards
       isSessionCard: true,
-      imageData: sessionCard.imageData
+      imageData: sessionCard.imageData,
+      image_url: sessionCard.image_url
     };
   });
 }
