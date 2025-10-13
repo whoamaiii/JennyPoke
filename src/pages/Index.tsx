@@ -18,36 +18,62 @@ import { PokemonTCGError } from '@/services/pokemonTcgApi';
 const Dashboard = lazy(() => import('@/components/Dashboard').then(module => ({ default: module.Dashboard })));
 
 // Storage Status Component
-const StorageStatus = () => {
-  const [storageInfo, setStorageInfo] = useState<{ isAtCapacity: boolean; message: string }>({
-    isAtCapacity: false,
-    message: 'Loading...'
+const StorageStatus = ({ savedCardsCount }: { savedCardsCount: number }) => {
+  const [storageInfo, setStorageInfo] = useState<{ 
+    canOpen: boolean; 
+    message: string; 
+    remainingSlots: number;
+    sessionCards: number;
+  }>({
+    canOpen: true,
+    message: 'Loading...',
+    remainingSlots: 32,
+    sessionCards: 0
   });
 
   useEffect(() => {
     const updateStorageInfo = async () => {
       try {
-        const { checkCapacityLimit } = await import('@/services/sessionCardManager');
-        const info = checkCapacityLimit();
-        setStorageInfo(info);
+        const { canOpenPack, getSessionStats } = await import('@/services/sessionCardManager');
+        const packCheck = canOpenPack(savedCardsCount);
+        const stats = getSessionStats();
+        
+        setStorageInfo({
+          canOpen: packCheck.canOpen,
+          message: packCheck.message,
+          remainingSlots: packCheck.remainingSlots,
+          sessionCards: stats.totalCards
+        });
       } catch (error) {
         console.error('Error checking storage capacity:', error);
         setStorageInfo({
-          isAtCapacity: false,
-          message: 'Storage status unavailable'
+          canOpen: true,
+          message: 'Storage status unavailable',
+          remainingSlots: 32,
+          sessionCards: 0
         });
       }
     };
 
     updateStorageInfo();
-    // Update every 5 seconds
-    const interval = setInterval(updateStorageInfo, 5000);
+    // Update every 3 seconds
+    const interval = setInterval(updateStorageInfo, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [savedCardsCount]);
 
   return (
-    <div className={`text-center ${storageInfo.isAtCapacity ? 'text-orange-500' : 'text-muted-foreground'}`}>
-      {storageInfo.message}
+    <div className="text-center space-y-1">
+      <div className={`text-sm ${!storageInfo.canOpen ? 'text-red-500' : 'text-muted-foreground'}`}>
+        Saved: {savedCardsCount}/32 cards
+      </div>
+      <div className="text-xs text-muted-foreground">
+        Session: {storageInfo.sessionCards} cards available
+      </div>
+      {!storageInfo.canOpen && (
+        <div className="text-xs text-red-500">
+          Remove {8 - storageInfo.remainingSlots} cards to open pack
+        </div>
+      )}
     </div>
   );
 };
@@ -162,17 +188,26 @@ const Index = () => {
         checkNeedRefresh,
         refreshSessionCards,
         getSessionStats,
-        checkCapacityLimit
+        canOpenPack,
+        shouldDownloadMoreCards
       } = await import('@/services/sessionCardManager');
       
-      // Check capacity limit before opening pack
-      const capacityCheck = checkCapacityLimit();
-      if (capacityCheck.isAtCapacity) {
-        toast.error(capacityCheck.message, {
+      // Check if user can open a pack based on their saved cards
+      const packCheck = canOpenPack(favorites.length);
+      if (!packCheck.canOpen) {
+        toast.error(packCheck.message, {
           duration: 5000,
         });
         setIsLoading(false);
         return;
+      }
+      
+      // Check if we need to download more cards for session storage
+      const downloadCheck = shouldDownloadMoreCards(favorites.length);
+      if (downloadCheck.shouldDownload) {
+        console.log(`[Index] ${downloadCheck.reason}`);
+        toast.info('Downloading more cards in background...');
+        refreshSessionCards();
       }
       
       // Check if we have cards available
@@ -309,9 +344,17 @@ const Index = () => {
     } else {
       // Card was dismissed - remove it from session storage immediately
       try {
-        const { removeCardsFromSession } = await import('@/services/sessionCardManager');
+        const { removeCardsFromSession, shouldDownloadMoreCards, refreshSessionCards } = await import('@/services/sessionCardManager');
         removeCardsFromSession([cardId]);
         console.log(`[Index] Removed dismissed card ${cardId} from session storage`);
+        
+        // Check if we need to download more cards after dismissing
+        const downloadCheck = shouldDownloadMoreCards(favorites.length);
+        if (downloadCheck.shouldDownload) {
+          console.log(`[Index] ${downloadCheck.reason}`);
+          toast.info('Downloading more cards in background...');
+          refreshSessionCards();
+        }
       } catch (error) {
         console.error('[Index] Error removing dismissed card from session storage:', error);
       }
@@ -406,7 +449,7 @@ const Index = () => {
 
               {/* Storage Status Indicator */}
               <div className="mt-4 text-sm text-muted-foreground">
-                <StorageStatus />
+                <StorageStatus savedCardsCount={favorites.length} />
               </div>
 
               <Button

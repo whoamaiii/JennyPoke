@@ -528,6 +528,60 @@ export function checkCapacityLimit(): { isAtCapacity: boolean; message: string }
 }
 
 /**
+ * Check if user can open a pack based on their saved cards (favorites)
+ * This prevents overflow when user saves all cards from a pack
+ */
+export function canOpenPack(savedCardsCount: number): { canOpen: boolean; message: string; remainingSlots: number } {
+  const maxSavedCards = CARDS_TO_LOAD; // 32 cards max
+  const packSize = PACK_SIZE; // 8 cards per pack
+  const remainingSlots = maxSavedCards - savedCardsCount;
+  
+  if (remainingSlots < packSize) {
+    return {
+      canOpen: false,
+      message: `Cannot open pack. You have ${savedCardsCount}/${maxSavedCards} saved cards. Need to remove ${packSize - remainingSlots} more cards to open a pack.`,
+      remainingSlots
+    };
+  }
+  
+  return {
+    canOpen: true,
+    message: `Can open pack. ${remainingSlots} slots available (${savedCardsCount}/${maxSavedCards} saved)`,
+    remainingSlots
+  };
+}
+
+/**
+ * Check if we need to download more cards for session storage
+ * This ensures user can save all cards from future packs
+ */
+export function shouldDownloadMoreCards(savedCardsCount: number): { shouldDownload: boolean; reason: string } {
+  const sessionState = getSessionState();
+  const currentSessionCards = sessionState.cards.length;
+  const maxSavedCards = CARDS_TO_LOAD; // 32 cards max
+  const packSize = PACK_SIZE; // 8 cards per pack
+  const remainingSlots = maxSavedCards - savedCardsCount;
+  
+  // Calculate how many packs user can potentially open
+  const potentialPacks = Math.floor(remainingSlots / packSize);
+  
+  // We need at least 2 packs worth of cards in session storage for smooth experience
+  const minSessionCards = Math.max(packSize * 2, packSize * potentialPacks);
+  
+  if (currentSessionCards < minSessionCards) {
+    return {
+      shouldDownload: true,
+      reason: `Session storage low (${currentSessionCards} cards). Need ${minSessionCards} cards to support ${potentialPacks} potential pack openings.`
+    };
+  }
+  
+  return {
+    shouldDownload: false,
+    reason: `Session storage sufficient (${currentSessionCards} cards) for ${potentialPacks} potential pack openings.`
+  };
+}
+
+/**
  * Remove cards from session storage (for dismissed cards)
  */
 export function removeCardsFromSession(cardIds: string[]): void {
