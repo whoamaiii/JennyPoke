@@ -383,9 +383,9 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-40">
+      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-40 flex-shrink-0">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <img src={pokeballSvg} alt="Pokéball" className="w-6 h-6" />
@@ -416,11 +416,11 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center px-4 py-8">
+      <main className="flex-1 flex items-center justify-center px-4 py-8 min-h-0">
         {/* view transition wrapper */}
         <div id="view-root" ref={viewRootRef} className="w-full max-w-4xl">
           {view === 'home' && (
-            <div className="flex flex-col items-center justify-center min-h-[80vh] text-center">
+            <div className="flex flex-col items-center justify-center h-full text-center">
               <div className="mb-8">
                 <img src={pokeballSvg} alt="Pokéball" className="w-28 h-28 mb-4 mx-auto" />
               </div>

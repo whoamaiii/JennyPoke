@@ -108,7 +108,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
     window.location.reload();
   };
   return (
-    <div className="h-screen flex flex-col p-8">
+    <div className="h-full flex flex-col p-8 overflow-y-auto">
       <div className="max-w-7xl mx-auto flex-1 flex flex-col">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold flex items-center gap-3">

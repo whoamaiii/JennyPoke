@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { CardData } from '@/types/pokemon';
 import { PokemonCard } from './PokemonCard';
 import { Heart, X } from 'lucide-react';
+import cardBackImage from '@/assets/pokemon-card-back.png';
 
 interface CardViewerProps {
   cards: CardData[];
@@ -92,7 +93,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   };
 
   const swipeCard = useCallback((direction: 'left' | 'right') => {
-    if (isAnimating || !cardRef.current || !currentCard || !isRevealed) return;
+    if (isAnimating || !cardRef.current || !currentCard) return;
     
     setIsAnimating(true);
     const isFavorite = direction === 'left';
@@ -149,7 +150,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     hammer.get('pan').set({ direction: Hammer.DIRECTION_ALL, threshold: 10 });
 
     hammer.on('panmove', (e) => {
-      if (isAnimating || !cardRef.current || !isRevealed) return;
+      if (isAnimating || !cardRef.current) return;
 
       const deltaX = e.deltaX;
       // Limit vertical movement to prevent cards from appearing at wrong positions
@@ -165,7 +166,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     });
 
     hammer.on('panend', (e) => {
-      if (isAnimating || !cardRef.current || !isRevealed) return;
+      if (isAnimating || !cardRef.current) return;
 
       const deltaX = e.deltaX;
       const velocityX = e.velocityX;
@@ -202,7 +203,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isAnimating || !isRevealed) return;
+      if (isAnimating) return;
 
       switch (e.key) {
         case 'ArrowLeft':
@@ -270,23 +271,19 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           onClick={handleCardReveal}
         >
           {!isRevealed ? (
-            // Show card back initially
-            <div className="w-80 h-96 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-2xl flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-2xl m-2 flex items-center justify-center">
-                <div className="text-center text-white">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-white rounded-full flex items-center justify-center">
-                    <div className="w-12 h-12 bg-red-500 rounded-full"></div>
-                  </div>
-                  <p className="text-lg font-bold">Tap to reveal</p>
-                  <p className="text-sm opacity-80">Your Pokémon card</p>
-                </div>
-              </div>
+            // Show actual Pokemon card back
+            <div className="w-80 h-96 rounded-2xl shadow-2xl overflow-hidden">
+              <img 
+                src={cardBackImage} 
+                alt="Pokémon Card Back" 
+                className="w-full h-full object-cover cursor-pointer" 
+              />
             </div>
           ) : (
             // Show actual card after reveal
-          <div style={{ backfaceVisibility: 'hidden' }}>
-            <PokemonCard card={currentCard} showBack={false} />
-          </div>
+            <div style={{ backfaceVisibility: 'hidden' }}>
+              <PokemonCard card={currentCard} showBack={false} />
+            </div>
           )}
         </div>
 
@@ -309,13 +306,13 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         </div>
       </div>
 
-      {/* Controls area - bottom section */}
-      <div className="pb-8 pt-4 flex flex-col items-center gap-4">
-        {/* Navigation row: Left arrow, Counter, Right arrow */}
+      {/* Controls area - positioned directly below card */}
+      <div className="flex flex-col items-center gap-4 pb-8">
+        {/* Navigation row: Heart, Counter, X */}
         <div className="flex items-center gap-4">
           <button
             onClick={() => swipeCard('left')}
-            disabled={isAnimating || !isRevealed}
+            disabled={isAnimating}
             className="p-3 rounded-full bg-card/90 backdrop-blur border border-border hover:bg-card/100 transition-colors disabled:opacity-50"
             aria-label="Favorite (swipe left)"
           >
@@ -330,7 +327,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
           <button
             onClick={() => swipeCard('right')}
-            disabled={isAnimating || !isRevealed}
+            disabled={isAnimating}
             className="p-3 rounded-full bg-card/90 backdrop-blur border border-border hover:bg-card/100 transition-colors disabled:opacity-50"
             aria-label="Dismiss (swipe right)"
           >
