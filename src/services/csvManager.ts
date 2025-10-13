@@ -325,14 +325,14 @@ export async function refreshCSVData(): Promise<boolean> {
 }
 
 /**
- * Get all cards available for use (pending or success status)
+ * Get all cards available for use (regardless of status)
  */
 export async function getPendingCards(): Promise<CardCSVRow[]> {
   console.log('[CSVManager] Loading CSV data to find available cards...');
   const { cards } = await loadCSVData();
   console.log(`[CSVManager] Loaded ${cards.length} total cards from CSV`);
   
-  // Log first few cards to see their status
+  // Log first few cards to see their details
   if (cards.length > 0) {
     console.log('[CSVManager] First 3 cards:', cards.slice(0, 3).map(c => ({
       id: `${c.set_id}-${c.card_number}`,
@@ -341,14 +341,10 @@ export async function getPendingCards(): Promise<CardCSVRow[]> {
     })));
   }
   
-  // Use cards with 'success' status (already downloaded) or 'pending' status
-  // Filter out only 'failed' or 'error' status cards
-  const availableCards = cards.filter(card => 
-    card.status === 'pending' || card.status === 'success'
-  );
-  console.log(`[CSVManager] Found ${availableCards.length} available cards (pending or success status)`);
+  // Return all cards regardless of status
+  console.log(`[CSVManager] Found ${cards.length} available cards (all cards, no status filter)`);
   
-  return availableCards;
+  return cards;
 }
 
 /**
