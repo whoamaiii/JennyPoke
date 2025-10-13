@@ -389,7 +389,7 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <img src={pokeballSvg} alt="Pokéball" className="w-6 h-6" />
-            <h1 className="text-2xl font-bold hidden lg:block">Pokémon Pack Opener</h1>
+            <h1 className="text-2xl font-bold hidden lg:block">Pokémon Packs Opener</h1>
           </div>
           
           <div className="flex gap-2">
@@ -426,7 +426,7 @@ const Index = () => {
               </div>
               
               <h2 className="text-4xl md:text-5xl font-bold mb-8 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                Open Your Pokémon Pack
+                Open Your Pokémon Packs
               </h2>
               
               <Button
@@ -554,3 +554,4 @@ const Index = () => {
 };
 
 export default Index;
+
