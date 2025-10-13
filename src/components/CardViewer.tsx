@@ -3,7 +3,7 @@ import Hammer from 'hammerjs';
 import gsap from 'gsap';
 import { CardData } from '@/types/pokemon';
 import { PokemonCard } from './PokemonCard';
-import { Heart, ArrowLeft, ArrowRight, X } from 'lucide-react';
+import { Heart, X } from 'lucide-react';
 
 interface CardViewerProps {
   cards: CardData[];
@@ -192,11 +192,11 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault();
-          swipeCard('left');
+          swipeCard('left'); // Heart/favorite
           break;
         case 'ArrowRight':
           e.preventDefault();
-          swipeCard('right');
+          swipeCard('right'); // X/dismiss
           break;
       }
     };
@@ -285,7 +285,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
             className="p-3 rounded-full bg-card/90 backdrop-blur border border-border hover:bg-card/100 transition-colors disabled:opacity-50"
             aria-label="Favorite (swipe left)"
           >
-            <ArrowLeft className="w-6 h-6" />
+            <Heart className="w-6 h-6 text-red-500 fill-red-500" />
           </button>
 
           <div className="bg-card/90 backdrop-blur px-6 py-3 rounded-full shadow-lg border border-border min-w-[100px] text-center">
@@ -298,9 +298,9 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
             onClick={() => swipeCard('right')}
             disabled={isAnimating}
             className="p-3 rounded-full bg-card/90 backdrop-blur border border-border hover:bg-card/100 transition-colors disabled:opacity-50"
-            aria-label="Skip (swipe right)"
+            aria-label="Dismiss (swipe right)"
           >
-            <ArrowRight className="w-6 h-6" />
+            <X className="w-6 h-6 text-gray-500" />
           </button>
         </div>
       </div>

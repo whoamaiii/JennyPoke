@@ -144,25 +144,38 @@ export function createImagePlaceholder(width: number, height: number): string {
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
 
-  // Create a simple gradient placeholder
+  // Create a card-like gradient background
   const gradient = ctx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, '#f3f4f6');
-  gradient.addColorStop(1, '#e5e7eb');
+  gradient.addColorStop(0, '#f8fafc');
+  gradient.addColorStop(0.5, '#e2e8f0');
+  gradient.addColorStop(1, '#cbd5e1');
   
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
   
-  // Add a simple pattern
-  ctx.fillStyle = '#d1d5db';
-  for (let i = 0; i < width; i += 20) {
-    for (let j = 0; j < height; j += 20) {
-      if ((i + j) % 40 === 0) {
-        ctx.fillRect(i, j, 10, 10);
+  // Add a subtle border
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, width - 2, height - 2);
+  
+  // Add a subtle pattern
+  ctx.fillStyle = '#cbd5e1';
+  for (let i = 0; i < width; i += 30) {
+    for (let j = 0; j < height; j += 30) {
+      if ((i + j) % 60 === 0) {
+        ctx.fillRect(i, j, 15, 15);
       }
     }
   }
   
-  return canvas.toDataURL('image/jpeg', 0.1);
+  // Add "Loading..." text in the center
+  ctx.fillStyle = '#64748b';
+  ctx.font = `${Math.min(width, height) * 0.08}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Loading...', width / 2, height / 2);
+  
+  return canvas.toDataURL('image/jpeg', 0.8);
 }
 
 /**

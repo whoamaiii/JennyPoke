@@ -17,6 +17,41 @@ import { PokemonTCGError } from '@/services/pokemonTcgApi';
 // Lazy load the Dashboard component since it's only used occasionally
 const Dashboard = lazy(() => import('@/components/Dashboard').then(module => ({ default: module.Dashboard })));
 
+// Storage Status Component
+const StorageStatus = () => {
+  const [storageInfo, setStorageInfo] = useState<{ isAtCapacity: boolean; message: string }>({
+    isAtCapacity: false,
+    message: 'Loading...'
+  });
+
+  useEffect(() => {
+    const updateStorageInfo = async () => {
+      try {
+        const { checkCapacityLimit } = await import('@/services/sessionCardManager');
+        const info = checkCapacityLimit();
+        setStorageInfo(info);
+      } catch (error) {
+        console.error('Error checking storage capacity:', error);
+        setStorageInfo({
+          isAtCapacity: false,
+          message: 'Storage status unavailable'
+        });
+      }
+    };
+
+    updateStorageInfo();
+    // Update every 5 seconds
+    const interval = setInterval(updateStorageInfo, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className={`text-center ${storageInfo.isAtCapacity ? 'text-orange-500' : 'text-muted-foreground'}`}>
+      {storageInfo.message}
+    </div>
+  );
+};
+
 type View = 'home' | 'opening' | 'viewing' | 'completed' | 'dashboard';
 
 const Index = () => {
@@ -126,8 +161,19 @@ const Index = () => {
         markCardsAsShown,
         checkNeedRefresh,
         refreshSessionCards,
-        getSessionStats
+        getSessionStats,
+        checkCapacityLimit
       } = await import('@/services/sessionCardManager');
+      
+      // Check capacity limit before opening pack
+      const capacityCheck = checkCapacityLimit();
+      if (capacityCheck.isAtCapacity) {
+        toast.error(capacityCheck.message, {
+          duration: 5000,
+        });
+        setIsLoading(false);
+        return;
+      }
       
       // Check if we have cards available
       const stats = getSessionStats();
@@ -251,7 +297,7 @@ const Index = () => {
     handleOpenPack();
   };
 
-  const handleSwipe = (cardId: string, favorite: boolean) => {
+  const handleSwipe = async (cardId: string, favorite: boolean) => {
     if (favorite) {
       const card = currentPack.find((c) => c.id === cardId);
       if (card) {
@@ -259,6 +305,15 @@ const Index = () => {
         toast.success(`Added ${card.card.name} to favorites!`, {
           icon: <Heart className="w-4 h-4" fill="currentColor" />,
         });
+      }
+    } else {
+      // Card was dismissed - remove it from session storage immediately
+      try {
+        const { removeCardsFromSession } = await import('@/services/sessionCardManager');
+        removeCardsFromSession([cardId]);
+        console.log(`[Index] Removed dismissed card ${cardId} from session storage`);
+      } catch (error) {
+        console.error('[Index] Error removing dismissed card from session storage:', error);
       }
     }
   };
@@ -348,6 +403,11 @@ const Index = () => {
                   </>
                 )}
               </Button>
+
+              {/* Storage Status Indicator */}
+              <div className="mt-4 text-sm text-muted-foreground">
+                <StorageStatus />
+              </div>
 
               <Button
                 onClick={async () => {

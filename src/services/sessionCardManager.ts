@@ -13,7 +13,7 @@ import { downloadAndCompressImage, createImagePlaceholder } from '@/lib/imageUti
 // Constants
 const SESSION_STORAGE_KEY = 'pokemon_session_cards';
 const CONCURRENT_DOWNLOADS = 4; // Number of concurrent image downloads (reduced for stability)
-const CARDS_TO_LOAD = 32; // Maximum number of cards to keep in session storage
+const CARDS_TO_LOAD = 20; // Maximum number of cards to keep in session storage (reduced for stability)
 const REFRESH_THRESHOLD = 16; // Number of available cards before triggering a refresh
 const PACK_SIZE = 8; // Number of cards in a pack
 const MAX_RETRY_ATTEMPTS = 3; // Maximum retries for failed downloads
@@ -96,10 +96,29 @@ function saveSessionState(state: SessionCardState): void {
           return;
         }
         
-        // Strategy 2: Keep only half the cards
-        reducedState.cards = state.cards.slice(0, Math.floor(state.cards.length / 2));
-        console.log(`[SessionCardManager] Keeping only ${reducedState.cards.length} cards`);
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
+        // Strategy 2: Keep only recent cards (last 50)
+        if (reducedState.cards.length > 50) {
+          reducedState.cards = reducedState.cards.slice(-50);
+          console.log(`[SessionCardManager] Reduced to last 50 cards: ${reducedState.cards.length} cards`);
+        }
+        
+        // Strategy 3: If still too many, keep only 25 cards
+        if (reducedState.cards.length > 25) {
+          reducedState.cards = reducedState.cards.slice(-25);
+          console.log(`[SessionCardManager] Reduced to last 25 cards: ${reducedState.cards.length} cards`);
+        }
+        
+        // Strategy 4: If still failing, keep only 10 cards
+        if (reducedState.cards.length > 10) {
+          reducedState.cards = reducedState.cards.slice(-10);
+          console.log(`[SessionCardManager] Reduced to last 10 cards: ${reducedState.cards.length} cards`);
+        }
+        
+        // Try to save the reduced state
+        if (reducedState.cards.length > 0) {
+          sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
+          console.log(`[SessionCardManager] Successfully saved ${reducedState.cards.length} cards after cleanup`);
+        }
       } catch (cleanupError) {
         console.error('[SessionCardManager] Failed to clean up session storage:', cleanupError);
         // Last resort: clear everything
@@ -139,14 +158,12 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout: numb
  */
 async function tryDownloadImage(imageUrl: string): Promise<Blob | null> {
   const strategies = [
-    // Strategy 1: Try direct fetch (no proxy) - Pokemon TCG API may support CORS now
+    // Strategy 1: Try direct fetch (Pokemon TCG API supports CORS)
     { name: 'Direct', url: imageUrl },
-    // Strategy 2: Try with corsproxy.io
-    { name: 'corsproxy.io', url: `https://corsproxy.io/?${encodeURIComponent(imageUrl)}` },
-    // Strategy 3: Try with allorigins.win
-    { name: 'allorigins.win', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}` },
-    // Strategy 4: Try standard resolution if hi-res fails
+    // Strategy 2: Try standard resolution if hi-res fails
     { name: 'Standard res', url: imageUrl.replace('_hires', '') },
+    // Strategy 3: Try small image if large fails
+    { name: 'Small image', url: imageUrl.replace('large', 'small') },
   ];
   
   for (const strategy of strategies) {
@@ -183,11 +200,11 @@ async function downloadCardImage(card: CardCSVRow, retryCount = 0): Promise<Sess
   try {
     console.log(`[SessionCardManager] Downloading and compressing card image: ${card.set_id}-${card.card_number} from ${card.image_url}`);
     
-    // Use the new image compression utility
+    // Use the new image compression utility with smaller size for storage efficiency
     const compressedResult = await downloadAndCompressImage(card.image_url, {
-      maxWidth: 800,
-      maxHeight: 600,
-      quality: 0.8,
+      maxWidth: 400,
+      maxHeight: 300,
+      quality: 0.6,
       format: 'webp'
     });
     
@@ -213,9 +230,10 @@ async function downloadCardImage(card: CardCSVRow, retryCount = 0): Promise<Sess
       return downloadCardImage(card, retryCount + 1);
     }
     
-    // If all retries failed, create a placeholder
+    // If all retries failed, create a placeholder with correct aspect ratio
     console.warn(`[SessionCardManager] Creating placeholder for failed card ${card.set_id}-${card.card_number}`);
-    const placeholder = createImagePlaceholder(400, 600);
+    // Use smaller size to match compressed images (2.5:3.5 aspect ratio)
+    const placeholder = createImagePlaceholder(200, 280);
     
     return {
       id: `${card.set_id}-${card.card_number}`,
@@ -424,8 +442,16 @@ export function getRandomPack(): { cards: SessionCard[], needsRefresh: boolean }
   const availableCards = sessionState.cards.filter(card => !sessionState.shownCardIds.includes(card.id));
   console.log(`[SessionCardManager] ${availableCards.length} available cards after filtering shown cards`);
   
-  // If we've shown all cards, just use any cards (temporary solution)
-  const cardsToUse = availableCards.length > 0 ? availableCards : sessionState.cards;
+  // If we've shown all cards, trigger refresh instead of showing duplicates
+  if (availableCards.length === 0) {
+    console.log('[SessionCardManager] All cards have been shown, triggering refresh...');
+    if (!isDownloading && !sessionState.isLoading) {
+      refreshSessionCards();
+    }
+    return { cards: [], needsRefresh: true };
+  }
+  
+  const cardsToUse = availableCards;
   
   // Check if we need a refresh based on threshold
   const needsRefresh = availableCards.length <= REFRESH_THRESHOLD;
@@ -464,6 +490,51 @@ export function markCardsAsShown(cardIds: string[]): void {
   saveSessionState(sessionState);
   
   // Check if we need to refresh
+  if (checkNeedRefresh() && !isDownloading) {
+    toast.info('Downloading more cards in background...');
+    refreshSessionCards();
+  }
+}
+
+/**
+ * Check if we're at capacity and need to clean up before adding new cards
+ */
+export function checkCapacityLimit(): { isAtCapacity: boolean; message: string } {
+  const sessionState = getSessionState();
+  const currentCount = sessionState.cards.length;
+  const maxCapacity = CARDS_TO_LOAD;
+  
+  if (currentCount >= maxCapacity) {
+    return {
+      isAtCapacity: true,
+      message: `Storage at capacity (${currentCount}/${maxCapacity} cards). Please remove some cards from your collection before opening new packs.`
+    };
+  }
+  
+  return {
+    isAtCapacity: false,
+    message: `Storage: ${currentCount}/${maxCapacity} cards available`
+  };
+}
+
+/**
+ * Remove cards from session storage (for dismissed cards)
+ */
+export function removeCardsFromSession(cardIds: string[]): void {
+  const sessionState = getSessionState();
+  
+  // Remove cards from the cards array
+  sessionState.cards = sessionState.cards.filter(card => !cardIds.includes(card.id));
+  
+  // Also remove from shown list if they were there
+  sessionState.shownCardIds = sessionState.shownCardIds.filter(id => !cardIds.includes(id));
+  
+  // Save updated state
+  saveSessionState(sessionState);
+  
+  console.log(`[SessionCardManager] Removed ${cardIds.length} cards from session storage. Remaining: ${sessionState.cards.length} cards`);
+  
+  // Trigger refresh if we're running low on cards
   if (checkNeedRefresh() && !isDownloading) {
     toast.info('Downloading more cards in background...');
     refreshSessionCards();

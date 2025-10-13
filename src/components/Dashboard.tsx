@@ -2,35 +2,12 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { CardData, PokemonTCGCard } from '@/types/pokemon';
 import { PokemonCard } from './PokemonCard';
 import { Button } from './ui/button';
-import { Heart, Trash, Download, Loader2, Search, Filter } from 'lucide-react';
+import { Heart, Trash, Loader2, Search, Filter } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
-import { CollectionStats } from './CollectionStats';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
-function exportFavoritesAsCSV(favorites: CardData[]) {
-  if (!favorites || favorites.length === 0) return;
-  const headers = ['id','name','set','rarity','image_small','image_large'];
-  const rows = favorites.map(f => [
-    f.id,
-    `"${(f.card.name || '').replace(/"/g,'""')}"`,
-    `"${(f.card.set?.name || '').replace(/"/g,'""')}"`,
-    f.rarity || '',
-    f.card.images.small || '',
-    f.card.images.large || '',
-  ]);
-  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'favorites.csv';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
 
 interface DashboardProps {
   favorites: CardData[];
@@ -46,7 +23,6 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [selectedDetails, setSelectedDetails] = useState<PokemonTCGCard | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [rarityFilter, setRarityFilter] = useState<string>('all');
   const [setFilter, setSetFilter] = useState<string>('all');
 
   // Filter and search logic
@@ -56,25 +32,17 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
         card.card.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         card.card.set?.name?.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesRarity = rarityFilter === 'all' || 
-        (card.rarity?.toLowerCase() === rarityFilter.toLowerCase());
-      
       const matchesSet = setFilter === 'all' || 
         card.card.set?.name === setFilter;
       
-      return matchesSearch && matchesRarity && matchesSet;
+      return matchesSearch && matchesSet;
     });
-  }, [favorites, searchQuery, rarityFilter, setFilter]);
+  }, [favorites, searchQuery, setFilter]);
 
-  // Get unique sets and rarities for filters
+  // Get unique sets for filters
   const uniqueSets = useMemo(() => {
     const sets = [...new Set(favorites.map(card => card.card.set?.name).filter(Boolean))];
     return sets.sort();
-  }, [favorites]);
-
-  const uniqueRarities = useMemo(() => {
-    const rarities = [...new Set(favorites.map(card => card.rarity).filter(Boolean))];
-    return rarities.sort();
   }, [favorites]);
 
   // prefetched images for faster modal open (small set)
@@ -126,7 +94,6 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
     }
   }, []);
 
-  const handleExport = () => exportFavoritesAsCSV(favorites);
 
   const handleClearSession = () => {
     try {
@@ -146,13 +113,9 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold flex items-center gap-3">
             <Heart className="w-10 h-10 text-pokemon-red fill-pokemon-red" />
-            Collection ({favorites.length})
+            Faves ({favorites.length})
           </h1>
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={handleExport} variant="outline" size="sm" className="flex items-center gap-1 text-xs">
-              <Download className="w-3 h-3" />
-              Export CSV
-            </Button>
             <Button onClick={handleClearSession} variant="destructive" size="sm" className="flex items-center gap-1 text-xs">
               <Trash className="w-3 h-3" />
               Remove All
@@ -160,61 +123,42 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
           </div>
         </div>
 
-        {/* Collection Statistics */}
-        <div className="mb-8">
-          <CollectionStats cards={favorites} />
-        </div>
-
         {/* Search and Filters */}
-        {favorites.length > 0 && (
-          <div className="mb-6 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  placeholder="Search cards by name or set..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+          {favorites.length > 0 && (
+            <div className="mb-12 space-y-6">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Search cards by name or set..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Select value={setFilter} onValueChange={setSetFilter}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Set" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sets</SelectItem>
+                      {uniqueSets.map((set) => (
+                        <SelectItem key={set} value={set}>
+                          {set}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Select value={rarityFilter} onValueChange={setRarityFilter}>
-                  <SelectTrigger className="w-[140px]">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Rarity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Rarities</SelectItem>
-                    {uniqueRarities.map((rarity) => (
-                      <SelectItem key={rarity} value={rarity}>
-                        {rarity?.charAt(0).toUpperCase() + rarity?.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={setFilter} onValueChange={setSetFilter}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Set" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Sets</SelectItem>
-                    {uniqueSets.map((set) => (
-                      <SelectItem key={set} value={set}>
-                        {set}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {searchQuery || setFilter !== 'all' ? (
+                <div className="text-sm text-muted-foreground">
+                  Showing {filteredFavorites.length} of {favorites.length} cards
+                </div>
+              ) : null}
             </div>
-            {searchQuery || rarityFilter !== 'all' || setFilter !== 'all' ? (
-              <div className="text-sm text-muted-foreground">
-                Showing {filteredFavorites.length} of {favorites.length} cards
-              </div>
-            ) : null}
-          </div>
-        )}
+          )}
 
         {favorites.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-center">
@@ -242,7 +186,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
                   />
                 </div>
                 <div className="mt-4 text-center w-full max-w-[245px]">
-                  <p className="font-semibold text-lg">{card.card.name}</p>
+                  <p className="font-semibold text-lg">#{card.card.number || 'Unknown'}</p>
                   <p className="text-sm text-muted-foreground mb-3">{card.card.set.name}</p>
                   <Button
                     onClick={() => onRemoveFavorite(card.id)}
