@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Hammer from 'hammerjs';
 import gsap from 'gsap';
 import { CardData } from '@/types/pokemon';

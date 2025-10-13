@@ -1,4 +1,4 @@
-import { /* useState removed (declared below) */ } from 'react';
+import React from 'react';
 import { useSessionStorage } from '@/hooks/useSessionStorage';
 import { CardData } from '@/types/pokemon';
 import { openPack, testApiKey } from '@/services/pokemonTcgApi';

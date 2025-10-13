@@ -1,7 +1,7 @@
+import React, { useRef, useState, useEffect } from 'react';
 import { CardData } from '@/types/pokemon';
 import { cn } from '@/lib/utils';
 import cardBackImage from '@/assets/pokemon-card-back.png';
-import { useRef, useState, useEffect } from 'react';
 import gsap from 'gsap';
 import { CardSkeleton } from './CardSkeleton';
 import { preloadImage, createImagePlaceholder } from '@/lib/imageUtils';
