@@ -418,9 +418,9 @@ const Index = () => {
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 py-8 min-h-0">
         {/* view transition wrapper */}
-        <div id="view-root" ref={viewRootRef} className="w-full max-w-4xl">
+        <div id="view-root" ref={viewRootRef} className="w-full max-w-4xl flex items-center justify-center">
           {view === 'home' && (
-            <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="flex flex-col items-center justify-center h-full text-center w-full">
               <div className="mb-8">
                 <img src={pokeballSvg} alt="Pokéball" className="w-28 h-28 mb-4 mx-auto" />
               </div>

@@ -4,7 +4,6 @@ import gsap from 'gsap';
 import { CardData } from '@/types/pokemon';
 import { PokemonCard } from './PokemonCard';
 import { Heart, X } from 'lucide-react';
-import cardBackImage from '@/assets/pokemon-card-back.png';
 
 interface CardViewerProps {
   cards: CardData[];
@@ -271,13 +270,9 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           onClick={handleCardReveal}
         >
           {!isRevealed ? (
-            // Show actual Pokemon card back
-            <div className="w-80 h-96 rounded-2xl shadow-2xl overflow-hidden">
-              <img 
-                src={cardBackImage} 
-                alt="Pokémon Card Back" 
-                className="w-full h-full object-cover cursor-pointer" 
-              />
+            // Show actual Pokemon card back - same size as normal card
+            <div style={{ backfaceVisibility: 'hidden' }}>
+              <PokemonCard card={currentCard} showBack={true} />
             </div>
           ) : (
             // Show actual card after reveal
