@@ -24,11 +24,13 @@ const StorageStatus = ({ savedCardsCount }: { savedCardsCount: number }) => {
     message: string; 
     remainingSlots: number;
     sessionCards: number;
+    isLoading: boolean;
   }>({
     canOpen: true,
     message: 'Loading...',
     remainingSlots: 32,
-    sessionCards: 0
+    sessionCards: 0,
+    isLoading: false
   });
 
   useEffect(() => {
@@ -51,7 +53,8 @@ const StorageStatus = ({ savedCardsCount }: { savedCardsCount: number }) => {
           // Don't update state if values haven't changed
           if (prevState.canOpen === packCheck.canOpen &&
               prevState.remainingSlots === packCheck.remainingSlots &&
-              prevState.sessionCards === stats.totalCards) {
+              prevState.sessionCards === stats.totalCards &&
+              prevState.isLoading === stats.isLoading) {
             return prevState;
           }
           
@@ -59,7 +62,8 @@ const StorageStatus = ({ savedCardsCount }: { savedCardsCount: number }) => {
             canOpen: packCheck.canOpen,
             message: packCheck.message,
             remainingSlots: packCheck.remainingSlots,
-            sessionCards: stats.totalCards
+            sessionCards: stats.totalCards,
+            isLoading: stats.isLoading
           };
         });
       } catch (error) {
@@ -96,6 +100,9 @@ const StorageStatus = ({ savedCardsCount }: { savedCardsCount: number }) => {
       </div>
       <div className="text-xs text-muted-foreground">
         Session: {storageInfo.sessionCards} cards available
+        {storageInfo.isLoading && (
+          <span className="ml-2 text-blue-500">(Downloading...)</span>
+        )}
       </div>
       {!storageInfo.canOpen && (
         <div className="text-xs text-red-500">
@@ -119,6 +126,7 @@ const Index = () => {
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [isInitialDownloadComplete, setIsInitialDownloadComplete] = useState(false);
   const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
+  const [sessionIsLoading, setSessionIsLoading] = useState(false);
 
   useEffect(() => {
     if (!viewRootRef.current) return;
@@ -149,6 +157,40 @@ const Index = () => {
       }
     };
   }, [abortController]);
+
+  // Monitor session loading state
+  useEffect(() => {
+    let isMounted = true;
+    let checkInterval: number | null = null;
+    
+    const checkSessionLoading = async () => {
+      if (!isMounted) return;
+      
+      try {
+        const { getSessionStats } = await import('@/services/sessionCardManager');
+        const stats = getSessionStats();
+        
+        if (isMounted) {
+          setSessionIsLoading(stats.isLoading);
+        }
+      } catch (error) {
+        console.error('[Index] Error checking session loading state:', error);
+      }
+    };
+    
+    // Check immediately
+    checkSessionLoading();
+    
+    // Check periodically
+    checkInterval = window.setInterval(checkSessionLoading, 1000);
+    
+    return () => {
+      isMounted = false;
+      if (checkInterval !== null) {
+        window.clearInterval(checkInterval);
+      }
+    };
+  }, []);
 
   // Check initial download status on mount
   useEffect(() => {
@@ -249,7 +291,7 @@ const Index = () => {
   }, []); // No dependencies - only run once on mount
 
   const handleOpenPack = async () => {
-    if (isLoading || !isInitialDownloadComplete) return; // prevent multiple clicks and simultaneous operations
+    if (isLoading || !isInitialDownloadComplete || sessionIsLoading) return; // prevent multiple clicks and simultaneous operations
     
     setIsLoading(true);
     setError(null); // Clear any previous errors
@@ -509,13 +551,17 @@ const Index = () => {
                 Open Your Pokémon Packs
               </h2>
               
+              <div className="mb-6">
+                <StorageStatus savedCardsCount={favorites.length} />
+              </div>
+              
               <Button
                 onClick={handleOpenPack}
-                disabled={isLoading || !isInitialDownloadComplete || isBackgroundLoading}
+                disabled={isLoading || !isInitialDownloadComplete || isBackgroundLoading || sessionIsLoading}
                 variant="hero"
                 size="lg"
                 className="text-lg px-8 py-6"
-                aria-label={!isInitialDownloadComplete ? "Preparing cards for pack opening" : isLoading ? "Opening pack, please wait" : "Open a new Pokémon card pack"}
+                aria-label={!isInitialDownloadComplete ? "Preparing cards for pack opening" : isLoading ? "Opening pack, please wait" : sessionIsLoading ? "Downloading cards, please wait" : "Open a new Pokémon card pack"}
               >
                 {!isInitialDownloadComplete ? (
                   <>
@@ -526,6 +572,11 @@ const Index = () => {
                   <>
                     <Sparkles className="w-5 h-5 animate-spin" />
                     Opening Pack...
+                  </>
+                ) : sessionIsLoading ? (
+                  <>
+                    <Sparkles className="w-5 h-5 animate-spin" />
+                    Downloading Cards...
                   </>
                 ) : (
                   <>
@@ -570,13 +621,13 @@ const Index = () => {
                     setError(null);
                     handleOpenPack();
                   }}
-                  disabled={isLoading}
+                  disabled={isLoading || sessionIsLoading}
                   variant="hero"
                   size="lg"
                   className="text-lg px-8 py-6 h-auto"
                 >
                   <Sparkles className="mr-2 w-6 h-6" />
-                  {isLoading ? 'Opening...' : 'Open Another Pack'}
+                  {isLoading ? 'Opening...' : sessionIsLoading ? 'Downloading...' : 'Open Another Pack'}
                 </Button>
                 <Button
                   onClick={() => setView('dashboard')}
