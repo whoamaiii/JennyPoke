@@ -332,6 +332,15 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
       {/* Controls area - positioned directly below card */}
       <div className="flex flex-col items-center gap-4 pb-8">
+        {/* Tap to reveal instruction - above buttons with fixed height to prevent layout shift */}
+        <div className="h-6 flex items-center justify-center">
+          {!isRevealed && (
+            <p className="text-sm text-muted-foreground animate-fade-in">
+              Tap the card to reveal it
+            </p>
+          )}
+        </div>
+        
         {/* Navigation row: Heart, Counter, X */}
         <div className="flex items-center gap-4">
           <button
@@ -358,13 +367,6 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
             <X className="w-6 h-6 text-gray-500" />
           </button>
         </div>
-        
-        {/* Tap to reveal instruction */}
-        {!isRevealed && (
-          <div className="text-center text-muted-foreground">
-            <p className="text-sm">Tap the card to reveal it</p>
-          </div>
-        )}
       </div>
     </div>
   );

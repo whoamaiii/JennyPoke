@@ -108,8 +108,9 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
     window.location.reload();
   };
   return (
-    <div className="min-h-0 w-full overflow-y-auto">
-      <div className="max-w-7xl mx-auto p-8">
+    <div className="h-full w-full flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto p-8">
         {/* Header section - only visible when there are favorites */}
         {favorites.length > 0 && (
           <div className="flex justify-between items-center mb-8">
@@ -219,6 +220,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
             ))}
           </div>
         )}
+        </div>
       </div>
 
       {/* Modal for selected card (controlled) */}
