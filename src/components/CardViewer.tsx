@@ -290,6 +290,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           style={{
             perspective: '1000px',
             transformStyle: 'preserve-3d',
+            touchAction: 'none', // Enable Hammer.js touch gestures
           }}
           onClick={handleCardReveal}
         >
