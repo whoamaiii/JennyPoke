@@ -156,6 +156,8 @@ const Index = () => {
     let checkInterval: number | null = null;
     let timeoutId: number | null = null;
     
+    const MINIMUM_CARDS_FOR_PACK = 8; // Need at least 8 cards to open a pack
+    
     const checkInitialDownloadStatus = async () => {
       if (!isMounted) return;
       
@@ -166,14 +168,17 @@ const Index = () => {
         if (!isMounted) return;
         
         const stats = getSessionStats();
+        const availableCards = stats.totalCards - stats.shownCards;
         
-        // If we have cards available, initial download is complete
-        if (stats.totalCards > 0) {
+        console.log('[Index] Checking cards: Total:', stats.totalCards, 'Available:', availableCards);
+        
+        // Only mark as complete if we have enough cards to open a pack
+        if (availableCards >= MINIMUM_CARDS_FOR_PACK) {
           setIsInitialDownloadComplete(true);
-          console.log('[Index] Initial download already complete, cards available:', stats.totalCards);
+          console.log('[Index] Enough cards available to open pack:', availableCards);
         } else {
-          // Wait for the CardPreloader to complete its download
-          console.log('[Index] Waiting for initial download to complete...');
+          // Not enough cards yet, keep waiting
+          console.log('[Index] Not enough cards yet. Need', MINIMUM_CARDS_FOR_PACK, 'but have', availableCards);
           toast.info('Preparing cards for offline play...');
           
           // Check periodically until cards are available
@@ -183,14 +188,18 @@ const Index = () => {
             
             try {
               const currentStats = getSessionStats();
-              if (currentStats.totalCards > 0) {
+              const currentAvailable = currentStats.totalCards - currentStats.shownCards;
+              
+              console.log('[Index] Periodic check - Available cards:', currentAvailable);
+              
+              if (currentAvailable >= MINIMUM_CARDS_FOR_PACK) {
                 if (isMounted) {
                   setIsInitialDownloadComplete(true);
-                  console.log('[Index] Initial download completed, cards available:', currentStats.totalCards);
+                  console.log('[Index] Cards ready! Available:', currentAvailable);
                   toast.success('Cards ready! You can now open packs.');
                 }
                 
-                // Clear the interval once we have cards
+                // Clear the interval once we have enough cards
                 if (checkInterval !== null) {
                   window.clearInterval(checkInterval);
                   checkInterval = null;
