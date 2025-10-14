@@ -79,12 +79,13 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   };
 
   const handleCardReveal = () => {
-    if (isRevealed || isAnimating) return;
+    if (isAnimating) return;
     
     try {
-      setIsRevealed(true);
+      // Toggle the revealed state
+      setIsRevealed(!isRevealed);
       
-      // Add a subtle reveal animation
+      // Add a subtle flip animation
       if (cardRef.current) {
         gsap.fromTo(cardRef.current, 
           { scale: 0.95, opacity: 0.8 },
@@ -92,7 +93,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         );
       }
     } catch (error) {
-      console.error('Error revealing card:', error);
+      console.error('Error flipping card:', error);
       // Prevent UI from getting stuck if there's an error
       setIsAnimating(false);
     }
@@ -340,13 +341,11 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
       {/* Controls area - positioned directly below card */}
       <div className="flex flex-col items-center gap-4 pb-8">
-        {/* Tap to reveal instruction - above buttons with fixed height to prevent layout shift */}
+        {/* Tap to reveal/hide instruction - above buttons with fixed height to prevent layout shift */}
         <div className="h-6 flex items-center justify-center">
-          {!isRevealed && (
-            <p className="text-sm text-muted-foreground animate-fade-in">
-              Tap the card to reveal it
-            </p>
-          )}
+          <p className="text-sm text-muted-foreground animate-fade-in">
+            {isRevealed ? 'Tap the card to hide it' : 'Tap the card to reveal it'}
+          </p>
         </div>
         
         {/* Navigation row: Heart, Counter, X */}
