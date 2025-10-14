@@ -148,11 +148,14 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     });
   }, [isAnimating, currentCard, currentIndex, cards.length, onSwipe, onComplete]);
 
-  // Hammer.js setup
+  // Hammer.js setup with mouse and touch support
   useEffect(() => {
     if (!cardRef.current) return;
 
-    const hammer = new Hammer(cardRef.current);
+    // Enable both touch and mouse input
+    const hammer = new Hammer(cardRef.current, {
+      inputClass: Hammer.TouchMouseInput,
+    });
     hammer.get('pan').set({ direction: Hammer.DIRECTION_ALL, threshold: 10 });
 
     hammer.on('panmove', (e) => {
@@ -286,11 +289,15 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         {/* Current card */}
         <div
           ref={cardRef}
-          className="relative cursor-pointer"
+          className="relative cursor-grab active:cursor-grabbing select-none"
           style={{
             perspective: '1000px',
             transformStyle: 'preserve-3d',
-            touchAction: 'none', // Enable Hammer.js touch gestures
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            MozUserSelect: 'none',
+            msUserSelect: 'none',
           }}
           onClick={handleCardReveal}
         >
