@@ -114,8 +114,10 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
         {/* Search and Filters and Remove all - only show if there are favorites */}
         {favorites.length > 0 && (
           <div className="mb-8 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
+            {/* Main control row */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              {/* Left: Search bar */}
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   placeholder="Search cards by name or set..."
@@ -124,7 +126,9 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
                   className="pl-10"
                 />
               </div>
-              <div className="flex gap-2">
+        
+              {/* Right: Filters + Remove All */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 w-full lg:w-auto">
                 <Select value={setFilter} onValueChange={setSetFilter}>
                   <SelectTrigger className="w-[160px]">
                     <SelectValue placeholder="Set" />
@@ -138,21 +142,28 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button onClick={handleClearSession} variant="destructive" size="sm" className="flex items-center gap-1 text-xs">
+        
+                <Button
+                  onClick={handleClearSession}
+                  variant="destructive"
+                  size="sm"
+                  className="flex items-center gap-1 text-xs sm:ml-auto"
+                >
                   <Trash className="w-3 h-3" />
                   Remove All
                 </Button>
               </div>
             </div>
-            {searchQuery || setFilter !== 'all' ? (
+        
+            {/* Filter summary */}
+            {(searchQuery || setFilter !== 'all') && (
               <div className="text-sm text-muted-foreground">
                 Showing {filteredFavorites.length} of {favorites.length} cards
               </div>
-            ) : null}
+            )}
           </div>
         )}
+
 
         {/* Content area - either empty state or grid of cards */}
         {favorites.length === 0 ? (
@@ -338,4 +349,5 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
     </div>
   );
 };
+
 
