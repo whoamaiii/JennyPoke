@@ -8,6 +8,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { VersionChecker } from "@/components/VersionChecker";
+import { StorageCompatibilityCheck } from "@/components/StorageCompatibilityCheck";
 
 // Lazy load components
 const Index = lazy(() => import("./pages/Index"));
@@ -121,6 +122,8 @@ const App = () => {
               <CardPreloader />
               {/* Version checker monitors for app updates */}
               <VersionChecker />
+              {/* Storage compatibility checker */}
+              <StorageCompatibilityCheck />
               <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
                   <Route path="/" element={<Index />} />

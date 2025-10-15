@@ -9,6 +9,7 @@ import { CardCSVRow, SessionCard, SessionCardState } from '@/types/pokemon';
 import { getRandomPendingCards } from './csvManager';
 import { toast } from 'sonner';
 import { downloadAndCompressImage, createImagePlaceholder } from '@/lib/imageUtils';
+import { universalStorage, isStorageCriticallyLow } from '@/lib/storageManager';
 
 // Constants
 const SESSION_STORAGE_KEY = 'pokemon_session_cards';
@@ -54,12 +55,12 @@ export async function initializeSessionCards(): Promise<boolean> {
  */
 export function getSessionState(): SessionCardState {
   try {
-    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    const stored = universalStorage.getItem(SESSION_STORAGE_KEY);
     if (stored) {
       return JSON.parse(stored) as SessionCardState;
     }
   } catch (error) {
-    console.error('Error reading session storage:', error);
+    console.error('[SessionCardManager] Error reading storage:', error);
   }
   
   // Return default state if nothing in session or error
@@ -75,61 +76,46 @@ export function getSessionState(): SessionCardState {
  * Save session state
  */
 function saveSessionState(state: SessionCardState): void {
-  try {
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.error('Error saving to session storage:', error);
+  const success = universalStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(state));
+  
+  if (!success) {
+    console.warn('[SessionCardManager] Storage may be limited, attempting cleanup');
+    toast.warning('Storage limited. Reducing card count...');
     
-    // If storage is full, aggressively reduce cards
-    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      console.warn('[SessionCardManager] Quota exceeded! Attempting to free space...');
-      toast.error('Session storage full. Reducing card count...');
+    try {
+      // Strategy 1: Remove cards that have already been shown
+      let reducedState = { ...state };
+      reducedState.cards = state.cards.filter(card => !state.shownCardIds.includes(card.id));
       
-      try {
-        // Strategy 1: Remove cards that have already been shown
-        let reducedState = { ...state };
-        reducedState.cards = state.cards.filter(card => !state.shownCardIds.includes(card.id));
-        
-        // If still have cards, try to save
-        if (reducedState.cards.length > 0) {
-          console.log(`[SessionCardManager] Removed shown cards, now have ${reducedState.cards.length} cards`);
-          sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
-          return;
-        }
-        
-        // Strategy 2: Keep only recent cards (last 50)
-        if (reducedState.cards.length > 50) {
-          reducedState.cards = reducedState.cards.slice(-50);
-          console.log(`[SessionCardManager] Reduced to last 50 cards: ${reducedState.cards.length} cards`);
-        }
-        
-        // Strategy 3: If still too many, keep only 25 cards
-        if (reducedState.cards.length > 25) {
-          reducedState.cards = reducedState.cards.slice(-25);
-          console.log(`[SessionCardManager] Reduced to last 25 cards: ${reducedState.cards.length} cards`);
-        }
-        
-        // Strategy 4: If still failing, keep only 10 cards
-        if (reducedState.cards.length > 10) {
-          reducedState.cards = reducedState.cards.slice(-10);
-          console.log(`[SessionCardManager] Reduced to last 10 cards: ${reducedState.cards.length} cards`);
-        }
-        
-        // Try to save the reduced state
-        if (reducedState.cards.length > 0) {
-          sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
-          console.log(`[SessionCardManager] Successfully saved ${reducedState.cards.length} cards after cleanup`);
-        }
-      } catch (cleanupError) {
-        console.error('[SessionCardManager] Failed to clean up session storage:', cleanupError);
-        // Last resort: clear everything
-        try {
-          sessionStorage.removeItem(SESSION_STORAGE_KEY);
-          console.log('[SessionCardManager] Cleared all session storage as last resort');
-        } catch (e) {
-          console.error('[SessionCardManager] Could not clear session storage:', e);
-        }
+      // If still have cards, try to save
+      if (reducedState.cards.length > 0) {
+        console.log(`[SessionCardManager] Removed shown cards, now have ${reducedState.cards.length} cards`);
+        universalStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
+        return;
       }
+      
+      // Strategy 2: Keep only recent cards (last 50)
+      if (reducedState.cards.length > 50) {
+        reducedState.cards = reducedState.cards.slice(-50);
+        console.log(`[SessionCardManager] Reduced to last 50 cards`);
+      }
+      
+      // Strategy 3: Keep only 10 cards as last resort
+      if (reducedState.cards.length > 10) {
+        reducedState.cards = reducedState.cards.slice(-10);
+        console.log(`[SessionCardManager] Reduced to last 10 cards`);
+      }
+      
+      // Try to save the reduced state
+      if (reducedState.cards.length > 0) {
+        universalStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
+        console.log(`[SessionCardManager] Successfully saved ${reducedState.cards.length} cards after cleanup`);
+      }
+    } catch (cleanupError) {
+      console.error('[SessionCardManager] Failed to clean up storage:', cleanupError);
+      // Last resort: clear everything
+      universalStorage.removeItem(SESSION_STORAGE_KEY);
+      console.log('[SessionCardManager] Cleared all storage as last resort');
     }
   }
 }

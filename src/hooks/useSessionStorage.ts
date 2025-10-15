@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
+import { universalStorage } from '@/lib/storageManager';
 
 export function useSessionStorage<T>(key: string, initialValue: T) {
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
-      const item = window.sessionStorage.getItem(key);
+      const item = universalStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
-      console.error(error);
+      console.error('[useSessionStorage] Error reading initial value:', error);
       return initialValue;
     }
   });
@@ -15,9 +16,13 @@ export function useSessionStorage<T>(key: string, initialValue: T) {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
-      window.sessionStorage.setItem(key, JSON.stringify(valueToStore));
+      const success = universalStorage.setItem(key, JSON.stringify(valueToStore));
+      
+      if (!success) {
+        console.warn('[useSessionStorage] Storage may be limited, using fallback');
+      }
     } catch (error) {
-      console.error(error);
+      console.error('[useSessionStorage] Error setting value:', error);
     }
   };
 
