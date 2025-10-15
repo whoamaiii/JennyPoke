@@ -111,23 +111,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
     <div className="h-full w-full flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto p-8">
-        {/* Header section - only visible when there are favorites */}
-        {favorites.length > 0 && (
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-4xl font-bold flex items-center gap-3">
-              <Heart className="w-10 h-10 text-pokemon-red fill-pokemon-red" />
-              Faves ({favorites.length})
-            </h1>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={handleClearSession} variant="destructive" size="sm" className="flex items-center gap-1 text-xs">
-                <Trash className="w-3 h-3" />
-                Remove All
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Search and Filters - only show if there are favorites */}
+        {/* Search and Filters and Remove all - only show if there are favorites */}
         {favorites.length > 0 && (
           <div className="mb-8 space-y-4">
             <div className="flex flex-col sm:flex-row gap-4">
@@ -154,6 +138,12 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={handleClearSession} variant="destructive" size="sm" className="flex items-center gap-1 text-xs">
+                  <Trash className="w-3 h-3" />
+                  Remove All
+                </Button>
               </div>
             </div>
             {searchQuery || setFilter !== 'all' ? (
@@ -348,3 +338,4 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
     </div>
   );
 };
+
