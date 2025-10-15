@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { VersionChecker } from "@/components/VersionChecker";
 
 // Lazy load components
 const Index = lazy(() => import("./pages/Index"));
@@ -118,6 +119,8 @@ const App = () => {
             <BrowserRouter>
               {/* Card preloader runs as soon as the app mounts */}
               <CardPreloader />
+              {/* Version checker monitors for app updates */}
+              <VersionChecker />
               <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
                   <Route path="/" element={<Index />} />
