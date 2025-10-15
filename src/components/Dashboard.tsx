@@ -111,14 +111,14 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
     <div className="h-full w-full flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto p-8">
+        
         {/* Search and Filters and Remove all - only show if there are favorites */}
         {favorites.length > 0 && (
           <div className="mb-8 space-y-4">
-            {/* Main control row */}
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              {/* Left: Search bar */}
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <div className="flex flex-col lg:flex-row lg:items-center lg:gap-4">
+              {/* Search bar */}
+              <div className="relative flex-1 min-w-[200px] mb-4 lg:mb-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   placeholder="Search cards by name or set..."
                   value={searchQuery}
@@ -127,31 +127,37 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
                 />
               </div>
         
-              {/* Right: Filters + Remove All */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 w-full lg:w-auto">
-                <Select value={setFilter} onValueChange={setSetFilter}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Set" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Sets</SelectItem>
-                    {uniqueSets.map((set) => (
-                      <SelectItem key={set} value={set}>
-                        {set}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Filter + Remove All */}
+              <div className="flex flex-col sm:flex-row sm:gap-2 w-full lg:w-auto lg:flex-row lg:flex-none lg:ml-auto">
+                {/* Set Filter */}
+                <div className="flex w-full sm:w-1/2 lg:w-[160px]">
+                  <Select value={setFilter} onValueChange={setSetFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Set" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sets</SelectItem>
+                      {uniqueSets.map((set) => (
+                        <SelectItem key={set} value={set}>
+                          {set}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
         
-                <Button
-                  onClick={handleClearSession}
-                  variant="destructive"
-                  size="sm"
-                  className="flex items-center gap-1 text-xs sm:ml-auto"
-                >
-                  <Trash className="w-3 h-3" />
-                  Remove All
-                </Button>
+                {/* Remove All Button */}
+                <div className="flex w-full sm:w-1/2 lg:w-auto justify-end">
+                  <Button
+                    onClick={handleClearSession}
+                    variant="destructive"
+                    size="sm"
+                    className="flex items-center justify-center gap-1 text-xs w-full sm:w-full lg:w-auto"
+                  >
+                    <Trash className="w-3 h-3" />
+                    Remove All
+                  </Button>
+                </div>
               </div>
             </div>
         
@@ -349,5 +355,6 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
     </div>
   );
 };
+
 
 
