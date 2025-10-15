@@ -73,14 +73,14 @@ export function getSessionState(): SessionCardState {
 }
 
 /**
- * Save session state
+ * Save session state with better error handling and feedback
  */
-function saveSessionState(state: SessionCardState): void {
+function saveSessionState(state: SessionCardState): boolean {
   const success = universalStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(state));
   
   if (!success) {
     console.warn('[SessionCardManager] Storage may be limited, attempting cleanup');
-    toast.warning('Storage limited. Reducing card count...');
+    toast.warning('Storage limited. Reducing card count...', { duration: 3000 });
     
     try {
       // Strategy 1: Remove cards that have already been shown
@@ -90,34 +90,58 @@ function saveSessionState(state: SessionCardState): void {
       // If still have cards, try to save
       if (reducedState.cards.length > 0) {
         console.log(`[SessionCardManager] Removed shown cards, now have ${reducedState.cards.length} cards`);
-        universalStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
-        return;
+        const retrySuccess = universalStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
+        if (retrySuccess) {
+          toast.info(`Saved ${reducedState.cards.length} cards to storage after cleanup.`, { duration: 3000 });
+          return true;
+        }
       }
       
       // Strategy 2: Keep only recent cards (last 50)
       if (reducedState.cards.length > 50) {
         reducedState.cards = reducedState.cards.slice(-50);
         console.log(`[SessionCardManager] Reduced to last 50 cards`);
+        const retrySuccess = universalStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
+        if (retrySuccess) {
+          toast.info(`Saved 50 most recent cards due to storage limits.`, { duration: 3000 });
+          return true;
+        }
       }
       
       // Strategy 3: Keep only 10 cards as last resort
       if (reducedState.cards.length > 10) {
         reducedState.cards = reducedState.cards.slice(-10);
         console.log(`[SessionCardManager] Reduced to last 10 cards`);
+        const retrySuccess = universalStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
+        if (retrySuccess) {
+          toast.warning(`Storage critically low. Only saved 10 cards.`, { duration: 5000 });
+          return true;
+        }
       }
       
       // Try to save the reduced state
       if (reducedState.cards.length > 0) {
-        universalStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
-        console.log(`[SessionCardManager] Successfully saved ${reducedState.cards.length} cards after cleanup`);
+        const retrySuccess = universalStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(reducedState));
+        if (retrySuccess) {
+          console.log(`[SessionCardManager] Successfully saved ${reducedState.cards.length} cards after cleanup`);
+          return true;
+        }
       }
+      
+      console.error('[SessionCardManager] Failed all save attempts');
+      toast.error('Failed to save cards to storage. Storage may be full.', { duration: 5000 });
+      return false;
     } catch (cleanupError) {
       console.error('[SessionCardManager] Failed to clean up storage:', cleanupError);
       // Last resort: clear everything
       universalStorage.removeItem(SESSION_STORAGE_KEY);
       console.log('[SessionCardManager] Cleared all storage as last resort');
+      toast.error('Storage error. Cleared cache. Please try again.', { duration: 5000 });
+      return false;
     }
   }
+  
+  return true;
 }
 
 /**
@@ -339,18 +363,37 @@ export async function refreshSessionCards(isInitialLoad = false): Promise<boolea
     updatedState.lastLoadTime = Date.now();
     
     console.log(`[SessionCardManager] Saving ${updatedState.cards.length} cards to session storage...`);
-    saveSessionState(updatedState);
+    const saveSuccess = saveSessionState(updatedState);
+    
+    if (!saveSuccess) {
+      console.error('[SessionCardManager] Failed to save cards to storage');
+      return false;
+    }
     
     // Verify save was successful
     const verifyState = getSessionState();
     console.log(`[SessionCardManager] ✓ Verified: ${verifyState.cards.length} cards now in session storage`);
     
+    // Verify that cards were actually saved
+    if (verifyState.cards.length === 0) {
+      console.error('[SessionCardManager] Failed to save cards to storage!');
+      toast.error(`Downloaded ${newSessionCards.length} cards but failed to save them. Storage may be full or unavailable.`);
+      return false;
+    }
+    
+    // Check if some cards were lost during save
+    const cardsLost = (newSessionCards.length + updatedState.cards.length) - verifyState.cards.length;
+    if (cardsLost > 0) {
+      console.warn(`[SessionCardManager] ${cardsLost} cards were not saved (likely due to storage limit)`);
+      toast.warning(`Downloaded ${newSessionCards.length} cards. ${verifyState.cards.length} total cards now available for play.`);
+    } else {
+      toast.success(`Downloaded ${newSessionCards.length} cards! ${verifyState.cards.length} total cards available for play.`);
+    }
+    
     // Set flag based on successful download
     isInitialized = true;
     
-    // Show success message
-    console.log(`[SessionCardManager] Successfully downloaded and saved ${newSessionCards.length} cards`);
-    toast.success(`Downloaded ${newSessionCards.length} cards successfully!`);
+    console.log(`[SessionCardManager] Successfully downloaded and saved ${newSessionCards.length} cards. Total in storage: ${verifyState.cards.length}`);
     
     return true;
   } catch (error) {
@@ -457,7 +500,7 @@ export function getRandomPack(): { cards: SessionCard[], needsRefresh: boolean }
 /**
  * Mark cards as shown and update session state
  */
-export function markCardsAsShown(cardIds: string[]): void {
+export function markCardsAsShown(cardIds: string[]): boolean {
   const sessionState = getSessionState();
   
   // Add new IDs to shown list without duplicates
@@ -465,13 +508,20 @@ export function markCardsAsShown(cardIds: string[]): void {
   
   // Update session state
   sessionState.shownCardIds = newShownIds;
-  saveSessionState(sessionState);
+  const saveSuccess = saveSessionState(sessionState);
+  
+  if (!saveSuccess) {
+    console.error('[SessionCardManager] Failed to save shown card IDs');
+    return false;
+  }
   
   // Check if we need to refresh
   if (checkNeedRefresh() && !isDownloading) {
-    toast.info('Downloading more cards in background...');
+    toast.info('Downloading more cards in background...', { duration: 3000 });
     refreshSessionCards();
   }
+  
+  return true;
 }
 
 /**

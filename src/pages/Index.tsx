@@ -99,9 +99,13 @@ const StorageStatus = ({ savedCardsCount }: { savedCardsCount: number }) => {
         Saved: {savedCardsCount}/32 cards
       </div>
       <div className="text-xs text-muted-foreground">
-        Session: {storageInfo.sessionCards} cards available
+        {storageInfo.sessionCards > 0 ? (
+          <>Session: {storageInfo.sessionCards} cards available</>
+        ) : (
+          <>No cards in session - downloading...</>
+        )}
         {storageInfo.isLoading && (
-          <span className="ml-2 text-blue-500">(Downloading...)</span>
+          <span className="ml-2 text-blue-500 animate-pulse">(Loading...)</span>
         )}
       </div>
       {!storageInfo.canOpen && (
