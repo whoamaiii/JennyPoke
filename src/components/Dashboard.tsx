@@ -128,7 +128,7 @@ export const Dashboard = ({ favorites, onRemoveFavorite, onBackToHome }: Dashboa
               </div>
         
               {/* Filter + Remove All */}
-              <div className="flex flex-col sm:flex-row sm:gap-2 w-full lg:w-auto lg:flex-row lg:flex-none lg:ml-auto">
+              <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 w-full lg:w-auto lg:flex-row lg:flex-none lg:ml-auto">
                 {/* Set Filter */}
                 <div className="flex w-full sm:w-1/2 lg:w-[160px]">
                   <Select value={setFilter} onValueChange={setSetFilter}>
