@@ -23,59 +23,110 @@ const LoadingSpinner = () => (
   </div>
 );
 
-// Card Preloader component - handles initializing session cards
+// Card Preloader component - handles initializing IndexedDB and session cards
 const CardPreloader = () => {
   const [isLoading, setIsLoading] = useState(false);
-  
+
   useEffect(() => {
-    // Initialize session cards when app loads
+    // Initialize IndexedDB, migrate data, and download cards
     const initializeCards = async () => {
       setIsLoading(true);
       try {
-        // Dynamic import to avoid issues with server-side rendering
-        const { initializeSessionCards, getSessionStats, refreshSessionCards } = await import('@/services/sessionCardManager');
-        
-        // Check if we have cards in session already
-        const stats = getSessionStats();
-        console.log('[CardPreloader] Initial session stats:', stats);
-        
-        console.log('[CardPreloader] Session stats:', stats);
-        
-        // Always try to download cards on startup, even if we have some already
-        console.log('[CardPreloader] Downloading cards now...');
-        toast.info('Downloading cards for offline play...');
-        
-        try {
-          // Force immediate download of cards for session
-          const success = await refreshSessionCards();
-          if (success) {
-            // Check updated stats after download
-            const updatedStats = getSessionStats();
-            console.log('[CardPreloader] Updated session stats after download:', updatedStats);
-            toast.success(`${updatedStats.availableCards} card images ready for use!`);
-          } else {
-            toast.error('Failed to download card images. Pack opening may not work properly.');
+        console.log('[CardPreloader] Starting initialization...');
+
+        // Step 1: Initialize IndexedDB
+        const { indexedDBManager } = await import('@/lib/indexedDBManager');
+        await indexedDBManager.init();
+        console.log('[CardPreloader] IndexedDB initialized');
+
+        // Step 2: Run migration from sessionStorage if needed
+        const { migrateToIndexedDB, isMigrationCompleted } = await import('@/lib/storageMigration');
+        const migrated = await isMigrationCompleted();
+
+        if (!migrated) {
+          console.log('[CardPreloader] Running migration from sessionStorage to IndexedDB...');
+          toast.info('Upgrading storage system...');
+          const migrationResult = await migrateToIndexedDB();
+          if (migrationResult.success && migrationResult.migratedCards > 0) {
+            console.log(`[CardPreloader] Migrated ${migrationResult.migratedCards} cards successfully`);
+            toast.success(`Upgraded! ${migrationResult.migratedCards} cards migrated to new storage.`);
           }
-        } catch (err) {
-          console.error('[CardPreloader] Error downloading cards:', err);
-          toast.error('Error downloading cards. Please try refreshing the page.');
+        } else {
+          console.log('[CardPreloader] Migration already completed');
+        }
+
+        // Step 2.5: Warm up sessionStorage cache from IndexedDB
+        const { warmupCache } = await import('@/lib/cardStorageBridge');
+        const cachedCount = await warmupCache();
+        if (cachedCount > 0) {
+          console.log(`[CardPreloader] Warmed up cache with ${cachedCount} cards`);
+        }
+
+        // Step 3: Initialize session card manager
+        const { initializeSessionCards, getSessionStats, refreshSessionCards } = await import('@/services/sessionCardManager');
+
+        // Check if we have cards already
+        const stats = getSessionStats();
+        console.log('[CardPreloader] Current stats:', stats);
+
+        // Only download if we have NO cards at all (first time use)
+        if (stats.totalCards === 0) {
+          console.log('[CardPreloader] First time use - downloading initial cards...');
+          toast.info('First time setup: Downloading cards...', { duration: 5000 });
+
+          try {
+            const success = await refreshSessionCards(true); // Initial load
+            if (success) {
+              const updatedStats = getSessionStats();
+              console.log('[CardPreloader] Initial download complete:', updatedStats);
+              toast.success(`${updatedStats.totalCards} cards downloaded! Ready to play!`);
+            } else {
+              toast.warning('Download incomplete, but you can still try opening packs.');
+            }
+          } catch (err) {
+            console.error('[CardPreloader] Error downloading cards:', err);
+            toast.warning('Download had issues, but pack opening may still work.');
+          }
+        } else if (stats.availableCards < 16) {
+          // Have some cards, but running low - download more in BACKGROUND
+          console.log(`[CardPreloader] Running low on cards (${stats.availableCards} available) - downloading more in background...`);
+
+          // Don't await - let it run in background
+          refreshSessionCards().then(() => {
+            const updatedStats = getSessionStats();
+            console.log('[CardPreloader] Background download complete:', updatedStats);
+          }).catch(err => {
+            console.warn('[CardPreloader] Background download failed:', err);
+          });
+
+          // Show ready message immediately
+          toast.success(`${stats.availableCards} cards ready! More downloading in background...`);
+        } else {
+          console.log(`[CardPreloader] Already have ${stats.availableCards} cards available - ready to play!`);
+          toast.success(`${stats.availableCards} cards ready to use!`, { duration: 2000 });
+        }
+
+        // Step 4: Check storage quota
+        const storageEstimate = await indexedDBManager.estimateStorage();
+        if (storageEstimate) {
+          console.log(`[CardPreloader] Storage: ${(storageEstimate.usage / 1024 / 1024).toFixed(2)}MB / ${(storageEstimate.quota / 1024 / 1024).toFixed(2)}MB`);
         }
       } catch (error) {
-        console.error('[CardPreloader] Failed to initialize session cards:', error);
-        toast.error('Failed to load cards. Please refresh the page.');
+        console.error('[CardPreloader] Initialization failed:', error);
+        toast.error('Failed to initialize app. Please refresh the page.');
       } finally {
         setIsLoading(false);
       }
     };
-    
-    // Run after a small delay to allow the UI to render first
+
+    // Run immediately - no delay needed
     const timer = setTimeout(() => {
       initializeCards();
-    }, 1000);
-    
+    }, 100); // Minimal delay just to let UI render
+
     return () => clearTimeout(timer);
   }, []);
-  
+
   return null; // This component doesn't render anything visible
 };
 

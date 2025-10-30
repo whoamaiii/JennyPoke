@@ -13,7 +13,7 @@ const SETS_CSV_PATH = '/downloaded_sets.csv';
 const CARDS_CSV_PATH = '/downloaded_cards.csv';
 const SETS_CACHE_PATH = '/sets_cache.json';
 const CSV_HEADER_SETS = 'set_id,set_name,printed_total,last_updated,last_checked,cards_downloaded,set_complete';
-const CSV_HEADER_CARDS = 'set_id,set_name,card_number,filename,download_date,image_url,is_hires,file_size,download_duration,status';
+const CSV_HEADER_CARDS = 'set_id,set_name,card_number,filename,download_date,image_url,is_hires,file_size,download_duration,status,rarity,card_name';
 
 /**
  * Load and parse CSV data from file

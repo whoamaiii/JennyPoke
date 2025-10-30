@@ -247,7 +247,7 @@ export const EnhancedPackOpening = ({
         // Sparkles during shake with sound (optimized - fewer particles)
         const sparkleInterval = setInterval(() => {
           confetti({
-            particleCount: 2,  // Reduced from 3
+            particleCount: 1,  // Further reduced for performance
             startVelocity: 10,
             spread: 360,
             origin: {
@@ -260,10 +260,10 @@ export const EnhancedPackOpening = ({
           });
 
           // Play sparkle sound for rare cards (less frequently)
-          if (hasRareCard && Math.random() > 0.5) {
+          if (hasRareCard && Math.random() > 0.7) {
             audioManager.play('sparkle');
           }
-        }, 150 / speedMultiplier);  // Less frequent (was 100ms)
+        }, 200 / speedMultiplier);  // Less frequent for performance
 
         setTimeout(() => {
           clearInterval(sparkleInterval);
@@ -362,7 +362,7 @@ export const EnhancedPackOpening = ({
 
         // Main burst explosion (OPTIMIZED - fewer particles for performance)
         confetti({
-          particleCount: hasUltraRare ? 120 : hasRareCard ? 100 : 70,  // Reduced from 250/150
+          particleCount: hasUltraRare ? 60 : hasRareCard ? 50 : 35,  // Further reduced for performance
           spread: 120,
           startVelocity: 60,
           origin: { y: 0.5 },
@@ -373,22 +373,22 @@ export const EnhancedPackOpening = ({
             : ['#4A90E2', '#50C878', '#FFD700'],  // Blue/green for common
           shapes: ['circle', 'square'],
           gravity: 1.2,
-          drift: 0.3,  // Reduced drift for performance
-          ticks: 250  // Fewer ticks (was 300)
+          drift: 0.2,  // Reduced drift for performance
+          ticks: 200  // Fewer ticks for better performance
         });
 
         // Light ray effect (secondary burst) - only for rare cards
         if (hasRareCard) {
           setTimeout(() => {
             confetti({
-              particleCount: 30,  // Reduced from 50
+              particleCount: 20,  // Further reduced for performance
               angle: 90,
               spread: 360,
               startVelocity: 45,
               origin: { y: 0.5 },
               colors: ['#FFFFFF', '#FFFFAA'],
               shapes: ['line'],
-              ticks: 80  // Reduced from 100
+              ticks: 60  // Reduced for better performance
             });
           }, 100 / speedMultiplier);
         }

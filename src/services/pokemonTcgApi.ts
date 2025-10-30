@@ -3,16 +3,11 @@ import { PokemonTCGCard, CardData } from '@/types/pokemon';
 import { isDevModeEnabled } from '@/lib/devMode';
 
 const API_BASE = 'https://api.pokemontcg.io/v2';
-// CORS proxy for development - remove in production and use backend API
+// CORS proxy disabled - Pokemon TCG API supports CORS natively
 const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
-const USE_CORS_PROXY = true; // Enable CORS proxy for testing
+const USE_CORS_PROXY = false; // Disabled - API supports CORS directly
 
 const API_TIMEOUT = 400000; // 400 seconds (6.67 minutes) timeout - more than double the observed 139.2s response time
-
-// Development warning for CORS proxy usage
-if (USE_CORS_PROXY) {
-  console.warn('⚠️ Using CORS proxy for development. This should be disabled in production and replaced with a backend API.');
-}
 
 // Cache keys
 const CACHE_KEYS = {
@@ -74,10 +69,10 @@ export class PokemonTCGError extends Error {
   }
 }
 
-// Get API key from window if available
+// Get API key from environment variable
 const getHeaders = () => {
-  // API key is a publishable key and safe to store in code
-  const apiKey = '4c234358-ff65-4a99-9d97-84bf974ebd2b';
+  // API key from environment variable (Vite exposes VITE_* variables)
+  const apiKey = import.meta.env.VITE_POKEMON_TCG_API_KEY;
   return apiKey ? { 'X-Api-Key': apiKey } : {};
 };
 

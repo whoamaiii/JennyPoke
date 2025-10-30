@@ -10,6 +10,7 @@ import { getRandomPendingCards } from './csvManager';
 import { toast } from 'sonner';
 import { downloadAndCompressImage, createImagePlaceholder } from '@/lib/imageUtils';
 import { universalStorage, isStorageCriticallyLow } from '@/lib/storageManager';
+import { logger } from '@/lib/logger';
 
 // Constants
 const SESSION_STORAGE_KEY = 'pokemon_session_cards';
@@ -313,33 +314,87 @@ async function tryDownloadImage(imageUrl: string): Promise<Blob | null> {
  * Returns null on failure - no retries, just grab another card
  */
 async function downloadCardImage(card: CardCSVRow): Promise<SessionCard | null> {
+  const cardId = `${card.set_id}-${card.card_number}`;
+
   try {
-    console.log(`[SessionCardManager] Downloading and compressing card image: ${card.set_id}-${card.card_number} from ${card.image_url}`);
-    
-    // Use the new image compression utility with higher quality for better image clarity
-    const compressedResult = await downloadAndCompressImage(card.image_url, {
-      maxWidth: 600,
-      maxHeight: 450,
-      quality: 0.85,
-      format: 'webp'
-    });
-    
-    console.log(`[SessionCardManager] ✓ Card ${card.set_id}-${card.card_number} compressed: ${compressedResult.originalSize} → ${compressedResult.compressedSize} bytes (${compressedResult.compressionRatio.toFixed(1)}% reduction)`);
-    
+    logger.info('SessionCardManager', `Downloading card: ${cardId} from ${card.image_url}`);
+
+    // Try to download and compress the image with extended timeout
+    let compressedResult;
+    try {
+      compressedResult = await downloadAndCompressImage(card.image_url, {
+        maxWidth: 500,    // Smaller = faster download & compression
+        maxHeight: 375,   // Maintains aspect ratio
+        quality: 0.75,    // Good quality, faster compression
+        format: 'webp'    // Modern format with better compression
+      });
+
+      logger.debug('SessionCardManager', `✓ Compressed ${cardId}: ${compressedResult.compressionRatio.toFixed(1)}% reduction`);
+    } catch (imageError: any) {
+      logger.error('SessionCardManager', `Image download failed for ${cardId}: ${imageError.message}`);
+
+      // Try fallback URL (standard resolution instead of hires)
+      const fallbackUrl = card.image_url.replace('_hires', '');
+      if (fallbackUrl !== card.image_url) {
+        logger.info('SessionCardManager', `Trying fallback URL for ${cardId}: ${fallbackUrl}`);
+        try {
+          compressedResult = await downloadAndCompressImage(fallbackUrl, {
+            maxWidth: 500,
+            maxHeight: 375,
+            quality: 0.75,
+            format: 'webp'
+          });
+          logger.debug('SessionCardManager', `✓ Fallback successful for ${cardId}`);
+        } catch (fallbackError) {
+          logger.error('SessionCardManager', `Fallback also failed for ${cardId}`);
+          throw imageError; // Re-throw original error
+        }
+      } else {
+        throw imageError;
+      }
+    }
+
+    // Get rarity: CSV first, then API fallback, then pattern detection
+    let rarity = card.rarity; // From CSV if available
+    let cardName = card.card_name; // From CSV if available
+
+    if (!rarity) {
+      // Try fetching from API (with timeout) - but don't fail if this doesn't work
+      try {
+        const details = await fetchCardDetails(cardId);
+        if (details) {
+          rarity = details.rarity;
+          cardName = details.name;
+          logger.debug('SessionCardManager', `Fetched rarity from API: ${cardName} - ${rarity}`);
+        }
+      } catch (error) {
+        logger.debug('SessionCardManager', `API fetch failed for ${cardId}, using pattern detection`);
+      }
+    }
+
+    // Fallback to pattern detection if still no rarity
+    if (!rarity) {
+      const detectedRarity = detectRarityFromPattern(cardName || card.set_name, card.set_name);
+      rarity = detectedRarity.charAt(0).toUpperCase() + detectedRarity.slice(1);
+      logger.debug('SessionCardManager', `Pattern detected rarity: ${rarity}`);
+    }
+
     return {
-      id: `${card.set_id}-${card.card_number}`,
+      id: cardId,
       set_id: card.set_id,
       set_name: card.set_name,
       card_number: card.card_number,
       image_url: card.image_url,
       imageData: compressedResult.dataUrl,
-      filename: card.filename
+      filename: card.filename,
+      rarity: rarity, // Store rarity in SessionCard
+      card_name: cardName || `${card.set_name} #${card.card_number}` // Store name
     };
-  } catch (error) {
-    console.error(`[SessionCardManager] Error downloading card ${card.set_id}-${card.card_number}:`, error);
-    console.log(`[SessionCardManager] Skipping failed card ${card.set_id}-${card.card_number}, moving to next card`);
-    
-    // Skip this card and return null - no retries, no placeholders
+  } catch (error: any) {
+    logger.error('SessionCardManager', `Failed to download ${cardId}: ${error.message}`);
+    console.error(`[SessionCardManager] Full error for ${cardId}:`, error);
+
+    // Skip this card and return null
     return null;
   }
 }
@@ -451,11 +506,21 @@ export async function refreshSessionCards(isInitialLoad = false): Promise<boolea
     console.log(`[SessionCardManager] Successfully downloaded ${newSessionCards.length} out of ${randomCards.length} attempted`);
     
     if (newSessionCards.length === 0) {
-      console.error('[SessionCardManager] Failed to download any cards');
-      toast.error('Failed to download any cards. Check network connection and try again.');
+      logger.error('SessionCardManager', 'Failed to download any cards - all attempts failed');
+      toast.error('Failed to download cards. Please check your internet connection and try again.', {
+        duration: 5000
+      });
       sessionState.isLoading = false;
       saveSessionState(sessionState);
       return false;
+    }
+
+    // Warn if we got fewer cards than expected
+    if (newSessionCards.length < randomCards.length * 0.5) {
+      logger.warn('SessionCardManager', `Only downloaded ${newSessionCards.length}/${randomCards.length} cards (${Math.round(newSessionCards.length / randomCards.length * 100)}% success rate)`);
+      toast.warning(`Downloaded ${newSessionCards.length}/${randomCards.length} cards. Some downloads failed.`, {
+        duration: 4000
+      });
     }
     
     // Update session storage immediately with what we have, enforcing the limit
@@ -729,48 +794,43 @@ export function removeCardsFromSession(cardIds: string[]): void {
 
 /**
  * Convert session cards to format needed by pack opener
- * HOTFIX: Now async to fetch real card names and rarities from API
+ * OPTIMIZED: Uses rarity stored in SessionCard (no API calls!)
  */
 export async function convertSessionCardToCardData(sessionCards: SessionCard[]): Promise<any[]> {
-  console.log(`[SessionCardManager HOTFIX] Fetching real card details for ${sessionCards.length} cards from Pokemon TCG API...`);
+  logger.info('SessionCardManager', `Converting ${sessionCards.length} session cards to CardData`);
 
-  // Fetch all card details in parallel for speed
-  const cardDetailsPromises = sessionCards.map(card => fetchCardDetails(card.id));
-  const cardDetailsResults = await Promise.all(cardDetailsPromises);
-
-  return sessionCards.map((sessionCard, index) => {
+  return sessionCards.map((sessionCard) => {
     // Ensure we have valid image data
     if (!sessionCard.imageData) {
-      console.warn(`[SessionCardManager] Card ${sessionCard.id} has no imageData!`);
+      logger.warn('SessionCardManager', `Card ${sessionCard.id} has no imageData!`);
     }
 
-    const cardDetails = cardDetailsResults[index];
-
-    // Use real card name from API if available, otherwise use fallback
-    const cardName = cardDetails?.name || `${sessionCard.set_name} #${sessionCard.card_number}`;
-    const apiRarity = cardDetails?.rarity;
+    // Use rarity and name already stored in SessionCard (from download time)
+    const cardName = sessionCard.card_name || `${sessionCard.set_name} #${sessionCard.card_number}`;
+    const storedRarity = sessionCard.rarity;
 
     // Normalize rarity or fall back to pattern matching
     let detectedRarity: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
-    if (apiRarity) {
-      detectedRarity = normalizeRarity(apiRarity);
-      console.log(`[SessionCardManager] ✓ ${cardName}: "${apiRarity}" → ${detectedRarity}`);
+    if (storedRarity) {
+      detectedRarity = normalizeRarity(storedRarity);
+      logger.debug('SessionCardManager', `${cardName}: Using stored rarity ${storedRarity} → ${detectedRarity}`);
     } else {
+      // Fallback to pattern detection (should rarely happen with new system)
       detectedRarity = detectRarityFromPattern(cardName, sessionCard.set_name);
-      console.log(`[SessionCardManager] ⚠ ${cardName}: Pattern detected as ${detectedRarity} (API fetch failed)`);
+      logger.debug('SessionCardManager', `${cardName}: Pattern detected as ${detectedRarity}`);
     }
 
     return {
       id: sessionCard.id,
       card: {
         id: sessionCard.id,
-        name: cardName,  // Real card name from API
+        name: cardName,
         set: {
           id: sessionCard.set_id,
           name: sessionCard.set_name
         },
         number: sessionCard.card_number,
-        rarity: apiRarity || detectedRarity,  // Use API rarity string
+        rarity: storedRarity || detectedRarity,
         images: {
           small: sessionCard.imageData || sessionCard.image_url,
           large: sessionCard.imageData || sessionCard.image_url

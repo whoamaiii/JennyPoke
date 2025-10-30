@@ -63,7 +63,7 @@ export interface SetCSVRow {
 }
 
 // Structure for a row in downloaded_cards.csv
-// Columns: set_id,set_name,card_number,filename,download_date,image_url,is_hires,file_size,download_duration,status
+// Columns: set_id,set_name,card_number,filename,download_date,image_url,is_hires,file_size,download_duration,status,rarity,card_name
 export interface CardCSVRow {
   set_id: string;
   set_name: string;
@@ -75,6 +75,9 @@ export interface CardCSVRow {
   file_size: number;
   download_duration: number;
   status: string;
+  // NEW FIELDS (v2.0)
+  rarity?: string; // Card rarity from Pokemon TCG API
+  card_name?: string; // Card name from Pokemon TCG API
 }
 
 // ============================================================================
@@ -91,6 +94,9 @@ export interface SessionCard {
   image_url: string;
   imageData: string; // Base64 encoded image data URL
   filename: string;
+  // NEW FIELDS (v2.0)
+  rarity?: string; // Card rarity from CSV/API
+  card_name?: string; // Card name from CSV/API
 }
 
 // Structure for tracking session state
