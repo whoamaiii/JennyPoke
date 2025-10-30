@@ -19,98 +19,17 @@ const Dashboard = lazy(() => import('@/components/Dashboard').then(module => ({ 
 
 // Storage Status Component
 const StorageStatus = ({ savedCardsCount }: { savedCardsCount: number }) => {
-  const [storageInfo, setStorageInfo] = useState<{ 
-    canOpen: boolean; 
-    message: string; 
-    remainingSlots: number;
-    sessionCards: number;
-    isLoading: boolean;
-  }>({
-    canOpen: true,
-    message: 'Loading...',
-    remainingSlots: 32,
-    sessionCards: 0,
-    isLoading: false
-  });
-
-  useEffect(() => {
-    let isMounted = true;
-    
-    const updateStorageInfo = async () => {
-      // Skip update if component is unmounted
-      if (!isMounted) return;
-      
-      try {
-        const { canOpenPack, getSessionStats } = await import('@/services/sessionCardManager');
-        
-        // Skip update if component is unmounted
-        if (!isMounted) return;
-        
-        const packCheck = canOpenPack(savedCardsCount);
-        const stats = getSessionStats();
-        
-        setStorageInfo(prevState => {
-          // Don't update state if values haven't changed
-          if (prevState.canOpen === packCheck.canOpen &&
-              prevState.remainingSlots === packCheck.remainingSlots &&
-              prevState.sessionCards === stats.totalCards &&
-              prevState.isLoading === stats.isLoading) {
-            return prevState;
-          }
-          
-          return {
-            canOpen: packCheck.canOpen,
-            message: packCheck.message,
-            remainingSlots: packCheck.remainingSlots,
-            sessionCards: stats.totalCards,
-            isLoading: stats.isLoading
-          };
-        });
-      } catch (error) {
-        console.error('Error checking storage capacity:', error);
-        
-        // Skip update if component is unmounted
-        if (!isMounted) return;
-        
-        setStorageInfo(prevState => ({
-          ...prevState,
-          canOpen: true,
-          message: 'Storage status unavailable'
-        }));
-      }
-    };
-
-    // Initial update
-    updateStorageInfo();
-    
-    // Update periodically but not too frequently
-    const interval = setInterval(updateStorageInfo, 3000);
-    
-    // Cleanup
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [savedCardsCount]);
+  const remainingSlots = 32 - savedCardsCount;
+  const canOpen = remainingSlots >= 8;
 
   return (
     <div className="text-center space-y-1">
-      <div className={`text-sm ${!storageInfo.canOpen ? 'text-red-500' : 'text-muted-foreground'}`}>
+      <div className={`text-sm ${!canOpen ? 'text-red-500' : 'text-muted-foreground'}`}>
         Saved: {savedCardsCount}/32 cards
       </div>
-      <div className="text-xs text-muted-foreground">
-        {storageInfo.sessionCards > 0 ? (
-          <>Session: {storageInfo.sessionCards} cards available</>
-        ) : (
-          <>No cards in session - downloading...</>
-        )}
-        {storageInfo.isLoading && (
-          <span className="ml-2 text-muted-foreground/70">Loading...</span>
-        )}
-      </div>
-      {!storageInfo.canOpen && (
+      {!canOpen && (
         <div className="text-xs text-red-500">
-          Remove {8 - storageInfo.remainingSlots} cards to open pack
+          Remove {8 - remainingSlots} cards to open pack
         </div>
       )}
     </div>
@@ -128,9 +47,7 @@ const Index = () => {
   const viewRootRef = useRef<HTMLDivElement | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
-  const [isInitialDownloadComplete, setIsInitialDownloadComplete] = useState(false);
-  const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
-  const [sessionIsLoading, setSessionIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     if (!viewRootRef.current) return;
@@ -162,144 +79,44 @@ const Index = () => {
     };
   }, [abortController]);
 
-  // Monitor session loading state
+  // Simple initialization on mount
   useEffect(() => {
     let isMounted = true;
-    let checkInterval: number | null = null;
-    
-    const checkSessionLoading = async () => {
-      if (!isMounted) return;
-      
+
+    const initialize = async () => {
       try {
-        const { getSessionStats } = await import('@/services/sessionCardManager');
-        const stats = getSessionStats();
-        
+        const { initializeSessionCards, getSessionStats } = await import('@/services/sessionCardManager');
+
+        // Start initialization (downloads cards if needed)
+        await initializeSessionCards();
+
         if (isMounted) {
-          setSessionIsLoading(stats.isLoading);
+          const stats = getSessionStats();
+          console.log('[Index] Initialized with', stats.totalCards, 'cards');
+          setIsInitialized(true);
         }
       } catch (error) {
-        console.error('[Index] Error checking session loading state:', error);
+        console.error('[Index] Error during initialization:', error);
+        // Allow pack opening even if initialization fails
+        if (isMounted) {
+          setIsInitialized(true);
+        }
       }
     };
-    
-    // Check immediately
-    checkSessionLoading();
-    
-    // Check periodically
-    checkInterval = window.setInterval(checkSessionLoading, 1000);
-    
+
+    initialize();
+
     return () => {
       isMounted = false;
-      if (checkInterval !== null) {
-        window.clearInterval(checkInterval);
-      }
     };
   }, []);
 
-  // Check initial download status on mount
-  useEffect(() => {
-    let isMounted = true;
-    let checkInterval: number | null = null;
-    let timeoutId: number | null = null;
-    
-    const MINIMUM_CARDS_FOR_PACK = 8; // Need at least 8 cards to open a pack
-    
-    const checkInitialDownloadStatus = async () => {
-      if (!isMounted) return;
-      
-      try {
-        const { getSessionStats } = await import('@/services/sessionCardManager');
-        
-        // Prevent state updates if unmounted
-        if (!isMounted) return;
-        
-        const stats = getSessionStats();
-        const availableCards = stats.totalCards - stats.shownCards;
-        
-        console.log('[Index] Checking cards: Total:', stats.totalCards, 'Available:', availableCards);
-        
-        // Only mark as complete if we have enough cards to open a pack
-        if (availableCards >= MINIMUM_CARDS_FOR_PACK) {
-          setIsInitialDownloadComplete(true);
-          console.log('[Index] Enough cards available to open pack:', availableCards);
-        } else {
-          // Not enough cards yet, keep waiting
-          console.log('[Index] Not enough cards yet. Need', MINIMUM_CARDS_FOR_PACK, 'but have', availableCards);
-          toast.info('Preparing cards for offline play...');
-          
-          // Check periodically until cards are available
-          // Store the interval ID so we can clear it in cleanup
-          checkInterval = window.setInterval(() => {
-            if (!isMounted) return;
-            
-            try {
-              const currentStats = getSessionStats();
-              const currentAvailable = currentStats.totalCards - currentStats.shownCards;
-              
-              console.log('[Index] Periodic check - Available cards:', currentAvailable);
-              
-              if (currentAvailable >= MINIMUM_CARDS_FOR_PACK) {
-                if (isMounted) {
-                  setIsInitialDownloadComplete(true);
-                  console.log('[Index] Cards ready! Available:', currentAvailable);
-                  toast.success('Cards ready! You can now open packs.');
-                }
-                
-                // Clear the interval once we have enough cards
-                if (checkInterval !== null) {
-                  window.clearInterval(checkInterval);
-                  checkInterval = null;
-                }
-              }
-            } catch (checkError) {
-              console.error('[Index] Error during periodic check:', checkError);
-            }
-          }, 1000);
-          
-          // Clear interval after 30 seconds to avoid infinite checking
-          timeoutId = window.setTimeout(() => {
-            if (checkInterval !== null) {
-              window.clearInterval(checkInterval);
-              checkInterval = null;
-            }
-            
-            if (isMounted && !isInitialDownloadComplete) {
-              console.warn('[Index] Initial download timeout, allowing pack opening anyway');
-              setIsInitialDownloadComplete(true);
-            }
-          }, 30000);
-        }
-      } catch (error) {
-        console.error('[Index] Error checking initial download status:', error);
-        // Allow pack opening even if check fails
-        if (isMounted) {
-          setIsInitialDownloadComplete(true);
-        }
-      }
-    };
-    
-    checkInitialDownloadStatus();
-    
-    // Clean up all timers when component unmounts
-    return () => {
-      isMounted = false;
-      
-      if (checkInterval !== null) {
-        window.clearInterval(checkInterval);
-      }
-      
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, []); // No dependencies - only run once on mount
-
   const handleOpenPack = async () => {
-    if (isLoading || !isInitialDownloadComplete || sessionIsLoading) return; // prevent multiple clicks and simultaneous operations
-    
+    // Only prevent multiple simultaneous pack openings
+    if (isLoading) return;
+
     setIsLoading(true);
-    setError(null); // Clear any previous errors
-    toast.info('Fetching cards from API...');
+    setError(null);
 
     console.log('🎯 Starting pack opening process...');
     const startTime = Date.now();
@@ -340,54 +157,19 @@ const Index = () => {
       const stats = getSessionStats();
       console.log(`[Index] Opening pack, session has ${stats.totalCards} total cards, ${stats.availableCards} available`);
       
-      // If no cards at all, start downloading and show appropriate feedback
-      if (stats.totalCards === 0) {
-        console.log('[Index] No cards in session, initiating download');
-        toast.info('No cards loaded yet. Downloading cards now...');
-        
-        // Try to download cards and check if we got any
-        const downloadSuccess = await refreshSessionCards();
-        if (!downloadSuccess) {
-          console.error('[Index] Initial card download failed');
-          throw new PokemonTCGError('Failed to download cards. Please check your network connection and try again.', 'NO_DATA');
-        }
-        
-        // Check if we have cards after download
-        const updatedStats = getSessionStats();
-        if (updatedStats.totalCards === 0) {
-          console.error('[Index] No cards available after download attempt');
-          throw new PokemonTCGError('No cards available after download. Please try again later.', 'NO_DATA');
-        }
-      }
-      
-      // Get cards from session storage instead of API
+      // Get cards from session storage
       console.log('[Index] Requesting random pack from session storage');
       const { cards: sessionCards, needsRefresh } = getRandomPack();
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log(`[Index] Got ${sessionCards.length} cards from session in ${duration}s`);
-      
+
+      // If no cards available, trigger download and ask user to try again
       if (sessionCards.length === 0) {
-        console.error('[Index] No session cards returned from getRandomPack');
-        
-        // If cards are still downloading, provide clearer feedback
-        if (stats.isLoading) {
-          console.log('[Index] Cards are still loading, asking user to wait');
-          toast.info('Cards are still downloading. Please try again in a few moments.');
-          throw new PokemonTCGError('Cards are being downloaded. Please wait a moment and try again.', 'NO_DATA');
-        } else {
-          // If not loading but no cards, force a refresh and provide clear guidance
-          console.log('[Index] No cards and not loading, forcing refresh');
-          toast.info('No cards available. Downloading new cards now...');
-          
-          const refreshSuccess = await refreshSessionCards();
-          if (refreshSuccess) {
-            toast.success('Cards downloaded! Try opening a pack now.');
-          }
-          
-          throw new PokemonTCGError('Cards are being downloaded. Please try opening a pack again.', 'NO_DATA');
-        }
+        console.log('[Index] No cards available, starting download');
+        refreshSessionCards().catch(err => console.error('Download failed:', err));
+        throw new PokemonTCGError('Downloading cards now. Please try again in a moment.', 'NO_DATA');
       }
-      
+
       console.log(`[Index] Successfully retrieved ${sessionCards.length} cards for pack`);
       
       
@@ -398,22 +180,15 @@ const Index = () => {
       // Mark these cards as shown
       markCardsAsShown(sessionCards.map(card => card.id));
       
-      // Trigger background refresh if needed
+      // Trigger background refresh if needed (non-blocking)
       if (needsRefresh) {
         console.log('🔄 Background refresh triggered - downloading more cards');
-        toast.info('Downloading more cards in background...');
-        setIsBackgroundLoading(true);
         refreshSessionCards()
           .then(() => {
             console.log('✅ Background refresh completed');
-            toast.success('More cards downloaded successfully!');
           })
           .catch(err => {
             console.error('Background card refresh failed:', err);
-            toast.error('Background download failed, but you can still open packs');
-          })
-          .finally(() => {
-            setIsBackgroundLoading(false);
           });
       }
       
@@ -429,28 +204,10 @@ const Index = () => {
         new PokemonTCGError('An unexpected error occurred. Please try again.', 'UNKNOWN', error);
 
       setError(pokemonError);
-
-      // Show appropriate toast message based on error type
-      switch (pokemonError.code) {
-        case 'NO_DATA':
-          toast.error('No cards available right now. Still downloading cards - please try again in a moment.');
-          
-          // Try to refresh cards in background
-          try {
-            const { refreshSessionCards } = await import('@/services/sessionCardManager');
-            refreshSessionCards();
-          } catch (refreshError) {
-            console.error('Failed to trigger background refresh:', refreshError);
-          }
-          break;
-        default:
-          toast.error('Something went wrong loading cards. Please try again.');
-      }
-
-      console.error('Pack opening error:', pokemonError);
+      toast.error(pokemonError.message);
     } finally {
       setIsLoading(false);
-      setAbortController(null); // Clean up abort controller even though we're not using it
+      setAbortController(null);
     }
   };
 
@@ -561,26 +318,21 @@ const Index = () => {
               
               <Button
                 onClick={handleOpenPack}
-                disabled={isLoading || !isInitialDownloadComplete || isBackgroundLoading || sessionIsLoading}
+                disabled={isLoading || !isInitialized}
                 variant="hero"
                 size="lg"
                 className="text-lg px-8 py-6"
-                aria-label={!isInitialDownloadComplete ? "Preparing cards for pack opening" : isLoading ? "Opening pack, please wait" : sessionIsLoading ? "Downloading cards, please wait" : "Open a new Pokémon card pack"}
+                aria-label={!isInitialized ? "Initializing app" : isLoading ? "Opening pack, please wait" : "Open a new Pokémon card pack"}
               >
-                {!isInitialDownloadComplete ? (
+                {!isInitialized ? (
                   <>
                     <Sparkles className="w-5 h-5 animate-spin" />
-                    Preparing Cards...
+                    Loading...
                   </>
                 ) : isLoading ? (
                   <>
                     <Sparkles className="w-5 h-5 animate-spin" />
                     Opening Pack...
-                  </>
-                ) : sessionIsLoading ? (
-                  <>
-                    <Sparkles className="w-5 h-5 animate-spin" />
-                    Downloading Cards...
                   </>
                 ) : (
                   <>
@@ -625,13 +377,13 @@ const Index = () => {
                     setError(null);
                     handleOpenPack();
                   }}
-                  disabled={isLoading || sessionIsLoading}
+                  disabled={isLoading}
                   variant="hero"
                   size="lg"
                   className="text-lg px-8 py-6 h-auto"
                 >
                   <Sparkles className="mr-2 w-6 h-6" />
-                  {isLoading ? 'Opening...' : sessionIsLoading ? 'Downloading...' : 'Open Another Pack'}
+                  {isLoading ? 'Opening...' : 'Open Another Pack'}
                 </Button>
                 <Button
                   onClick={() => setView('dashboard')}

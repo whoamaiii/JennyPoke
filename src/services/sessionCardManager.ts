@@ -445,10 +445,10 @@ export function checkNeedRefresh(): boolean {
  */
 export function getRandomPack(): { cards: SessionCard[], needsRefresh: boolean } {
   const sessionState = getSessionState();
-  
+
   console.log(`[SessionCardManager] Getting random pack from ${sessionState.cards.length} total cards`);
   console.log(`[SessionCardManager] ${sessionState.shownCardIds.length} cards already shown`);
-  
+
   // Check if we have any cards at all first
   if (sessionState.cards.length === 0) {
     console.log('[SessionCardManager] No cards in session yet!');
@@ -458,41 +458,39 @@ export function getRandomPack(): { cards: SessionCard[], needsRefresh: boolean }
     }
     return { cards: [], needsRefresh: true };
   }
-  
+
   // Filter to cards that haven't been shown yet
-  const availableCards = sessionState.cards.filter(card => !sessionState.shownCardIds.includes(card.id));
+  let availableCards = sessionState.cards.filter(card => !sessionState.shownCardIds.includes(card.id));
   console.log(`[SessionCardManager] ${availableCards.length} available cards after filtering shown cards`);
-  
-  // If we've shown all cards, trigger refresh instead of showing duplicates
+
+  // If we've shown all cards, reset the shown list and use all cards again
   if (availableCards.length === 0) {
-    console.log('[SessionCardManager] All cards have been shown, triggering refresh...');
-    if (!isDownloading && !sessionState.isLoading) {
-      refreshSessionCards();
-    }
-    return { cards: [], needsRefresh: true };
+    console.log('[SessionCardManager] All cards have been shown, resetting shown list to allow re-viewing');
+    sessionState.shownCardIds = [];
+    saveSessionState(sessionState);
+    availableCards = sessionState.cards;
+    toast.info('All cards viewed! Shuffling deck for another round...');
   }
-  
-  const cardsToUse = availableCards;
-  
+
   // Check if we need a refresh based on threshold
   const needsRefresh = availableCards.length <= REFRESH_THRESHOLD;
-  
+
   // Randomize available cards
-  const shuffledCards = [...cardsToUse].sort(() => Math.random() - 0.5);
-  
+  const shuffledCards = [...availableCards].sort(() => Math.random() - 0.5);
+
   // Take at most PACK_SIZE cards
   const packCards = shuffledCards.slice(0, PACK_SIZE);
-  
-  // If we don't have enough cards, show what we have
-  if (packCards.length < PACK_SIZE) {
+
+  // If we don't have enough cards for a full pack, show what we have
+  if (packCards.length < PACK_SIZE && packCards.length > 0) {
     toast.warning(`Only ${packCards.length} cards available. Downloading more in background...`);
-    
+
     // Trigger a refresh in background if not already happening
     if (!isDownloading && !sessionState.isLoading) {
       refreshSessionCards();
     }
   }
-  
+
   console.log(`[SessionCardManager] Returning ${packCards.length} cards for pack`);
   return { cards: packCards, needsRefresh };
 }
