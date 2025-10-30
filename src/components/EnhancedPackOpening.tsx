@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { Loader2 } from 'lucide-react';
 import { audioManager } from '@/lib/audioManager';
 import { hapticManager } from '@/lib/haptics';
+import { ParticleTrailSystem } from '@/lib/particleTrail';
 
 export type AnimationSpeed = 'fast' | 'normal' | 'cinematic';
 export type PackDesign = 'standard' | 'premium' | 'ultra' | 'mystery';
@@ -37,6 +38,7 @@ export const EnhancedPackOpening = ({
   const foilFlashRef = useRef<(HTMLDivElement | null)[]>([]);
   const tearFragmentsRef = useRef<HTMLDivElement>(null);
   const cardShuffleRef = useRef<(HTMLDivElement | null)[]>([]);
+  const particleTrailRef = useRef<ParticleTrailSystem | null>(null);
   const [phase, setPhase] = useState<AnimationPhase>('anticipation');
   const [isSkipping, setIsSkipping] = useState(false);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
@@ -221,6 +223,27 @@ export const EnhancedPackOpening = ({
         // Haptic feedback for shake start
         hapticManager.vibrate(hasUltraRare ? 'heavy' : hasRareCard ? 'medium' : 'light');
 
+        // Initialize and start particle trail
+        if (packRef.current) {
+          particleTrailRef.current = new ParticleTrailSystem();
+          particleTrailRef.current.start(
+            packRef.current,
+            {
+              color: hasUltraRare
+                ? ['#FF00FF', '#9400D3', '#FFD700']
+                : hasRareCard
+                ? ['#FFD700', '#FFA500', '#FF6347']
+                : ['#4A90E2', '#50C878'],
+              particleCount: hasUltraRare ? 5 : hasRareCard ? 4 : 2,
+              velocity: 20,
+              spread: 50,
+              gravity: 1.0,
+              decay: 0.92,
+            },
+            1200 / speedMultiplier
+          );
+        }
+
         // Sparkles during shake with sound (optimized - fewer particles)
         const sparkleInterval = setInterval(() => {
           confetti({
@@ -245,6 +268,12 @@ export const EnhancedPackOpening = ({
         setTimeout(() => {
           clearInterval(sparkleInterval);
           audioManager.stop('pack-rustle');
+
+          // Stop particle trail
+          if (particleTrailRef.current) {
+            particleTrailRef.current.stop();
+            particleTrailRef.current = null;
+          }
         }, 1200 / speedMultiplier);
       }
     });
@@ -530,12 +559,26 @@ export const EnhancedPackOpening = ({
           )}
         </div>
 
-        {/* Cards burst effect */}
+        {/* Cards burst effect with shuffle preview */}
         <div
           ref={cardsRef}
           className="absolute inset-0 flex items-center justify-center opacity-0 scale-0 pointer-events-none"
         >
-          <Loader2 className="w-16 h-16 animate-spin text-primary" />
+          {/* Card silhouettes for shuffle preview */}
+          <div className="relative w-64 h-80">
+            {[...Array(cardCount)].map((_, i) => (
+              <div
+                key={i}
+                ref={(el) => { if (el) cardShuffleRef.current[i] = el; }}
+                className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg opacity-0"
+                style={{
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                }}
+              />
+            ))}
+          </div>
+
+          <Loader2 className="w-16 h-16 animate-spin text-primary absolute" />
         </div>
 
         {/* Skip instruction */}
