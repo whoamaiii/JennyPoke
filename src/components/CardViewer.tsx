@@ -101,7 +101,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
   const swipeCard = useCallback((direction: 'left' | 'right') => {
     if (isAnimating || !cardRef.current || !currentCard) return;
-    
+
     setIsAnimating(true);
     const isFavorite = direction === 'left';
 
@@ -119,25 +119,26 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
     gsap.to(cardRef.current, {
       x: xOffset,
-      y: 0, // Ensure consistent exit position
+      y: 0,
       rotation: rotation,
       opacity: 0,
       duration: isMobile ? 0.3 : 0.5,
       ease: 'power2.in',
       onComplete: () => {
         onSwipe(currentCard.id, isFavorite);
-        
+
         if (currentIndex < cards.length - 1) {
           setCurrentIndex(currentIndex + 1);
-          setIsRevealed(false); // Reset revealed state for next card
-          
-          // Reset card to exact center position
+          setIsRevealed(false);
+
+          // Reset card to exact center position immediately
           if (cardRef.current) {
             gsap.set(cardRef.current, {
               x: 0,
-              y: 0, // Fixed: Always reset to center
+              y: 0,
               rotation: 0,
               opacity: 1,
+              clearProps: 'all', // Clear all GSAP properties to ensure clean slate
             });
           }
           setIsAnimating(false);
