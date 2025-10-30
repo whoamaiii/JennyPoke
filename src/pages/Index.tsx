@@ -1,11 +1,17 @@
 import React from 'react';
 import { useSessionStorage } from '@/hooks/useSessionStorage';
-import { CardData } from '@/types/pokemon';
+import { CardData, PackType } from '@/types/pokemon';
 import { openPack } from '@/services/pokemonTcgApi';
 import { Button } from '@/components/ui/button';
 import { CardViewer } from '@/components/CardViewer';
-import { PackOpening } from '@/components/PackOpening';
+import { EnhancedPackOpening } from '@/components/EnhancedPackOpening';
+import { PackSelection } from '@/components/PackSelection';
+import { RareCardReveal } from '@/components/RareCardReveal';
+import { CardFanPreview } from '@/components/CardFanPreview';
+import { AudioControls } from '@/components/AudioControls';
+import { AnimationSpeedControl, useAnimationSpeed } from '@/components/AnimationSpeedControl';
 import { Sparkles, Heart } from 'lucide-react';
+// import { Calendar as CalendarIcon } from 'lucide-react'; // Hidden for now - advent calendar feature
 import { toast } from 'sonner';
 import gsap from 'gsap';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -13,9 +19,14 @@ import { useEffect, useRef, useState, Suspense, lazy } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import pokeballSvg from '@/assets/pokeball.svg';
 import { PokemonTCGError } from '@/services/pokemonTcgApi';
+import { DevModeToggle } from '@/components/DevModeToggle';
+import { getDefaultPackType } from '@/data/packTypes';
+import { generatePackWithWeights, analyzePackContents } from '@/lib/packGenerator';
 
 // Lazy load the Dashboard component since it's only used occasionally
 const Dashboard = lazy(() => import('@/components/Dashboard').then(module => ({ default: module.Dashboard })));
+// Lazy load the Advent Calendar component - Hidden for now
+// const AdventCalendar = lazy(() => import('@/components/advent/AdventCalendar').then(module => ({ default: module.AdventCalendar })));
 
 // Storage Status Component
 const StorageStatus = ({ savedCardsCount }: { savedCardsCount: number }) => {
@@ -117,7 +128,7 @@ const StorageStatus = ({ savedCardsCount }: { savedCardsCount: number }) => {
   );
 };
 
-type View = 'home' | 'opening' | 'viewing' | 'completed' | 'dashboard';
+type View = 'home' | 'pack-selection' | 'opening' | 'rare-reveal' | 'fan-preview' | 'viewing' | 'completed' | 'dashboard'; // | 'advent' - Hidden for now
 
 const Index = () => {
   const [view, setView] = useState<View>('home');
@@ -131,6 +142,9 @@ const Index = () => {
   const [isInitialDownloadComplete, setIsInitialDownloadComplete] = useState(false);
   const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
   const [sessionIsLoading, setSessionIsLoading] = useState(false);
+  const [selectedPackType, setSelectedPackType] = useState<PackType | null>(null);
+  const [animationSpeed] = useAnimationSpeed();
+  const [currentRareCardIndex, setCurrentRareCardIndex] = useState(0);
 
   useEffect(() => {
     if (!viewRootRef.current) return;
@@ -294,14 +308,18 @@ const Index = () => {
     };
   }, []); // No dependencies - only run once on mount
 
-  const handleOpenPack = async () => {
+  const handleOpenPack = async (packType?: PackType) => {
     if (isLoading || !isInitialDownloadComplete || sessionIsLoading) return; // prevent multiple clicks and simultaneous operations
-    
+
+    // Use provided pack type or default
+    const selectedPack = packType || selectedPackType || getDefaultPackType();
+    setSelectedPackType(selectedPack);
+
     setIsLoading(true);
     setError(null); // Clear any previous errors
     toast.info('Fetching cards from API...');
 
-    console.log('🎯 Starting pack opening process...');
+    console.log('🎯 Starting pack opening process with pack type:', selectedPack.name);
     const startTime = Date.now();
 
     try {
@@ -360,15 +378,17 @@ const Index = () => {
         }
       }
       
-      // Get cards from session storage instead of API
-      console.log('[Index] Requesting random pack from session storage');
+      // Get MORE cards from session storage than we need (to have variety for weighted selection)
+      // OPTIMIZED: Reduced from 32 to 3x pack size for faster API fetching
+      const cardsNeeded = selectedPack.cardCount * 3; // Get 3x the pack size for variety (was 4x/32)
+      console.log(`[Index] Requesting ${cardsNeeded} cards from session storage for weighted pack generation`);
       const { cards: sessionCards, needsRefresh } = getRandomPack();
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log(`[Index] Got ${sessionCards.length} cards from session in ${duration}s`);
-      
+
       if (sessionCards.length === 0) {
         console.error('[Index] No session cards returned from getRandomPack');
-        
+
         // If cards are still downloading, provide clearer feedback
         if (stats.isLoading) {
           console.log('[Index] Cards are still loading, asking user to wait');
@@ -378,25 +398,56 @@ const Index = () => {
           // If not loading but no cards, force a refresh and provide clear guidance
           console.log('[Index] No cards and not loading, forcing refresh');
           toast.info('No cards available. Downloading new cards now...');
-          
+
           const refreshSuccess = await refreshSessionCards();
           if (refreshSuccess) {
             toast.success('Cards downloaded! Try opening a pack now.');
           }
-          
+
           throw new PokemonTCGError('Cards are being downloaded. Please try opening a pack again.', 'NO_DATA');
         }
       }
-      
-      console.log(`[Index] Successfully retrieved ${sessionCards.length} cards for pack`);
-      
-      
-      // Convert session cards to card data format
-      const cards = convertSessionCardToCardData(sessionCards);
-      console.log(`✅ Pack opened from session in ${duration}s with ${cards.length} cards`);
-      
-      // Mark these cards as shown
-      markCardsAsShown(sessionCards.map(card => card.id));
+
+      // PERFORMANCE: Only convert the cards we actually need (not all session cards)
+      const cardsToConvert = sessionCards.slice(0, cardsNeeded);
+
+      // Convert session cards to card data format (now async for API rarity fetch - HOTFIX)
+      console.log(`[Index] Converting ${cardsToConvert.length} cards (API fetch with caching)...`);
+      const availableCards = await convertSessionCardToCardData(cardsToConvert);
+      console.log(`[Index] Converted ${availableCards.length} session cards to CardData format with rarities`);
+
+      // Generate pack using weighted rarity system
+      console.log(`[Index] Generating ${selectedPack.name} with weights:`, selectedPack.rarityWeights);
+      const cards = generatePackWithWeights(availableCards, selectedPack);
+
+      if (cards.length === 0) {
+        throw new PokemonTCGError('Failed to generate pack. Please try again.', 'NO_DATA');
+      }
+
+      // Analyze pack contents
+      const packAnalysis = analyzePackContents(cards);
+      console.log(`✅ ${selectedPack.name} opened in ${duration}s:`, {
+        total: cards.length,
+        hasRare: packAnalysis.hasRare,
+        hasUltraRare: packAnalysis.hasUltraRare,
+        rareCount: packAnalysis.rareCount,
+        ultraRareCount: packAnalysis.ultraRareCount,
+      });
+
+      // Show toast with pack contents
+      if (packAnalysis.hasUltraRare) {
+        toast.success(`🌟 ULTRA RARE! You got ${packAnalysis.ultraRareCount} ultra-rare card${packAnalysis.ultraRareCount > 1 ? 's' : ''}!`, {
+          duration: 5000,
+        });
+      } else if (packAnalysis.hasRare) {
+        toast.success(`✨ RARE! You got ${packAnalysis.rareCount} rare card${packAnalysis.rareCount > 1 ? 's' : ''}!`, {
+          duration: 4000,
+        });
+      }
+
+      // Mark the cards we used as shown
+      const usedSessionCards = sessionCards.slice(0, cards.length);
+      markCardsAsShown(usedSessionCards.map(card => card.id));
       
       // Trigger background refresh if needed
       if (needsRefresh) {
@@ -515,10 +566,10 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <img src={pokeballSvg} alt="Pokéball" className="w-6 h-6" />
-            <h1 className="text-2xl font-bold hidden lg:block">Pokémon Packs Opener</h1>
+            <h1 className="text-2xl font-bold hidden lg:block">Jenny's Pokedex</h1>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <Button
               variant="ghost"
               onClick={() => setView('home')}
@@ -526,6 +577,17 @@ const Index = () => {
             >
               Home
             </Button>
+            {/* Hidden for now - advent calendar button
+            <Button
+              variant="ghost"
+              onClick={() => setView('advent')}
+              disabled={view === 'advent'}
+              className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+            >
+              <CalendarIcon className="w-4 h-4 mr-1" />
+              Advent
+            </Button>
+            */}
             <Button
               variant="ghost"
               onClick={() => setView('dashboard')}
@@ -536,7 +598,11 @@ const Index = () => {
             <Button variant="ghost" onClick={() => setHelpOpen(true)}>
               Help
             </Button>
+            <div className="border-l border-border/50 h-6 mx-1" />
+            <AnimationSpeedControl />
+            <AudioControls />
             <ThemeToggle />
+            <DevModeToggle />
           </div>
         </div>
       </header>
@@ -547,53 +613,145 @@ const Index = () => {
         <div id="view-root" ref={viewRootRef} className={`w-full ${view === 'dashboard' ? 'h-full' : 'max-w-4xl flex items-center justify-center'}`}>
           {view === 'home' && (
             <div className="flex flex-col items-center justify-center h-full text-center w-full">
+              {/* Advent Calendar Promo Banner - Hidden for now
+              <div className="mb-6 w-full max-w-2xl">
+                <div
+                  className="bg-gradient-to-r from-red-600 via-green-600 to-red-600 p-1 rounded-lg cursor-pointer transform transition-all hover:scale-105"
+                  onClick={() => setView('advent')}
+                >
+                  <div className="bg-background rounded-md p-4">
+                    <div className="flex items-center justify-center gap-3 mb-2">
+                      <CalendarIcon className="w-6 h-6 text-red-600" />
+                      <h3 className="text-xl font-bold text-red-600">Christmas Advent Calendar</h3>
+                      <CalendarIcon className="w-6 h-6 text-red-600" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Open special packs daily from December 1-24 with custom cards! 🎄
+                    </p>
+                  </div>
+                </div>
+              </div>
+              */}
+
               <div className="mb-8">
                 <img src={pokeballSvg} alt="Pokéball" className="w-28 h-28 mb-4 mx-auto" />
               </div>
-              
+
               <h2 className="text-4xl md:text-5xl font-bold mb-8 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                Open Your Pokémon Packs
+                Jenny's Pokedex
               </h2>
               
               <div className="mb-6">
                 <StorageStatus savedCardsCount={favorites.length} />
               </div>
               
-              <Button
-                onClick={handleOpenPack}
-                disabled={isLoading || !isInitialDownloadComplete || isBackgroundLoading || sessionIsLoading}
-                variant="hero"
-                size="lg"
-                className="text-lg px-8 py-6"
-                aria-label={!isInitialDownloadComplete ? "Preparing cards for pack opening" : isLoading ? "Opening pack, please wait" : sessionIsLoading ? "Downloading cards, please wait" : "Open a new Pokémon card pack"}
-              >
-                {!isInitialDownloadComplete ? (
-                  <>
-                    <Sparkles className="w-5 h-5 animate-spin" />
-                    Preparing Cards...
-                  </>
-                ) : isLoading ? (
-                  <>
-                    <Sparkles className="w-5 h-5 animate-spin" />
-                    Opening Pack...
-                  </>
-                ) : sessionIsLoading ? (
-                  <>
-                    <Sparkles className="w-5 h-5 animate-spin" />
-                    Downloading Cards...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5" />
-                    Open Pack
-                  </>
-                )}
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button
+                  onClick={() => setView('pack-selection')}
+                  disabled={isLoading || !isInitialDownloadComplete || isBackgroundLoading || sessionIsLoading}
+                  variant="hero"
+                  size="lg"
+                  className="text-lg px-8 py-6"
+                  aria-label={!isInitialDownloadComplete ? "Preparing cards for pack opening" : "Choose a pack type to open"}
+                >
+                  {!isInitialDownloadComplete ? (
+                    <>
+                      <Sparkles className="w-5 h-5 animate-spin" />
+                      Preparing Cards...
+                    </>
+                  ) : sessionIsLoading ? (
+                    <>
+                      <Sparkles className="w-5 h-5 animate-spin" />
+                      Downloading Cards...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5" />
+                      Choose Pack Type
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={() => handleOpenPack()}
+                  disabled={isLoading || !isInitialDownloadComplete || isBackgroundLoading || sessionIsLoading}
+                  variant="outline"
+                  size="lg"
+                  className="text-lg px-8 py-6"
+                >
+                  Quick Open (Standard)
+                </Button>
+              </div>
             </div>
           )}
 
-          {view === 'opening' && (
-            <PackOpening onComplete={() => setView('viewing')} />
+          {view === 'pack-selection' && (
+            <PackSelection
+              onSelectPack={(packType) => {
+                setSelectedPackType(packType);
+                handleOpenPack(packType);
+              }}
+              isLoading={isLoading}
+              isCardsReady={isInitialDownloadComplete && !sessionIsLoading}
+            />
+          )}
+
+          {view === 'opening' && selectedPackType && (
+            <EnhancedPackOpening
+              onComplete={() => {
+                // Check if pack has rare cards
+                const rareCards = currentPack.filter(card =>
+                  ['rare', 'ultra-rare'].includes(card.rarity)
+                );
+
+                if (rareCards.length > 0) {
+                  setCurrentRareCardIndex(0);
+                  setView('rare-reveal');
+                } else {
+                  setView('fan-preview');
+                }
+              }}
+              hasRareCard={currentPack.some(card =>
+                card.rarity === 'rare' || card.rarity === 'ultra-rare'
+              )}
+              hasUltraRare={currentPack.some(card =>
+                card.rarity === 'ultra-rare'
+              )}
+              guaranteedRare={selectedPackType.guaranteedRare || false}
+              animationSpeed={animationSpeed}
+              packDesign={selectedPackType.design}
+              cardCount={currentPack.length}
+            />
+          )}
+
+          {view === 'rare-reveal' && currentPack.length > 0 && (
+            <RareCardReveal
+              card={currentPack.filter(card =>
+                ['rare', 'ultra-rare'].includes(card.rarity)
+              )[currentRareCardIndex]}
+              onComplete={() => {
+                const rareCards = currentPack.filter(card =>
+                  ['rare', 'ultra-rare'].includes(card.rarity)
+                );
+
+                // Show next rare card if available
+                if (currentRareCardIndex < rareCards.length - 1) {
+                  setCurrentRareCardIndex(currentRareCardIndex + 1);
+                } else {
+                  // All rare cards shown, move to fan preview
+                  setCurrentRareCardIndex(0);
+                  setView('fan-preview');
+                }
+              }}
+              duration={3000}
+            />
+          )}
+
+          {view === 'fan-preview' && currentPack.length > 0 && (
+            <CardFanPreview
+              cards={currentPack}
+              onComplete={() => setView('viewing')}
+              duration={2000}
+            />
           )}
 
           {view === 'viewing' && currentPack.length > 0 && (
@@ -659,6 +817,23 @@ const Index = () => {
               />
             </Suspense>
           )}
+
+          {/* Hidden for now - advent calendar view
+          {view === 'advent' && (
+            <Suspense fallback={
+              <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+              </div>
+            }>
+              <AdventCalendar
+                onBackToHome={() => setView('home')}
+                favorites={favorites}
+                onAddToFavorites={(card) => setFavorites([...favorites, card])}
+                onRemoveFavorite={handleRemoveFavorite}
+              />
+            </Suspense>
+          )}
+          */}
         </div>
         
         {/* Help modal (controlled) */}
@@ -679,6 +854,9 @@ const Index = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Dev Mode Toggle */}
+        <DevModeToggle />
       </main>
     </div>
   );

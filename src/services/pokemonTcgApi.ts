@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { PokemonTCGCard, CardData } from '@/types/pokemon';
+import { isDevModeEnabled } from '@/lib/devMode';
 
 const API_BASE = 'https://api.pokemontcg.io/v2';
 // CORS proxy for development - remove in production and use backend API
@@ -263,9 +264,15 @@ const generatePack = (commonCards: PokemonTCGCard[], uncommonCards: PokemonTCGCa
   const usedIds = new Set<string>();
 
   // Randomly decide pack composition (total 8 cards)
-  const numRares = Math.random() < 0.7 ? 1 : 0; // 70% chance of 1 rare
+  // Dev Mode: Guarantee at least 1 rare for testing holographic effects
+  const devMode = isDevModeEnabled();
+  const numRares = devMode ? 1 : (Math.random() < 0.7 ? 1 : 0); // 70% chance of 1 rare (100% in dev mode)
   const numUncommons = Math.floor(Math.random() * 3) + 1; // 1-3 uncommons
   const numCommons = 8 - numRares - numUncommons;
+
+  if (devMode) {
+    console.log('🔧 Dev Mode Active: Guaranteeing 1 holo card in pack');
+  }
 
   // Add commons
   const shuffledCommons = shuffleArray(commonCards);

@@ -13,6 +13,7 @@ import { StorageCompatibilityCheck } from "@/components/StorageCompatibilityChec
 // Lazy load components
 const Index = lazy(() => import("./pages/Index"));
 const Test = lazy(() => import("./pages/Test"));
+const HolographicDemo = lazy(() => import("./pages/HolographicDemo"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading component
@@ -128,6 +129,7 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/test" element={<Test />} />
+                  <Route path="/holo-demo" element={<HolographicDemo />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

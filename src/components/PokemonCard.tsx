@@ -6,6 +6,7 @@ import gsap from 'gsap';
 import { CardSkeleton } from './CardSkeleton';
 import { preloadImage, createImagePlaceholder } from '@/lib/imageUtils';
 import { getCardDimensions, getImageContainerClasses, getImageClasses } from '@/lib/cardUtils';
+import { useHolographicEffect } from '@/hooks/useHolographicEffect';
 
 // Preload card back image as soon as this component is imported
 const preloadCardBack = () => {
@@ -48,6 +49,10 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
   // UPDATED LOGIC: Interactive effect is enabled for 'grid' and 'large' sizes.
   // It is only disabled for 'small' and when the card back is showing.
   const isInteractive = size !== 'small' && !showBack;
+
+
+  // Check if this is a custom card
+  const isCustomCard = 'isCustom' in tcgCard && tcgCard.isCustom;
 
   useEffect(() => {
     if (!isInteractive) return;
@@ -138,7 +143,14 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
         )}
         style={{ perspective: '1000px', ...(style || {}) }}
       >
-        <div className={cn(getImageContainerClasses(), 'rounded-xl overflow-hidden relative')}>
+        <div className={cn(getImageContainerClasses(), 'rounded-xl overflow-hidden relative', isCustomCard && 'ring-2 ring-yellow-400 ring-offset-2')}>
+          {/* Custom Card Badge */}
+          {isCustomCard && (
+            <div className="absolute top-2 left-2 z-20 bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg animate-pulse">
+              ✨ CUSTOM
+            </div>
+          )}
+
           {/* Progress indicator */}
           {!loaded && (
             <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center z-10">

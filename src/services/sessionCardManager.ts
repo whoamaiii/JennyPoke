@@ -26,6 +26,110 @@ let isInitialized = false;
 let isDownloading = false;
 
 /**
+ * HOTFIX: Detect card rarity based on name patterns
+ * This is a temporary solution until we add rarity to CSV data
+ * Detects patterns like EX, GX, V, VMAX, Holo, etc.
+ */
+function detectRarityFromPattern(cardName: string, setName: string): 'common' | 'uncommon' | 'rare' | 'ultra-rare' {
+  const nameLower = cardName.toLowerCase();
+
+  // Ultra-Rare patterns (EX, GX, V, VMAX, VSTAR, Rainbow, Gold, Secret)
+  if (nameLower.includes(' ex') ||
+      nameLower.includes(' gx') ||
+      nameLower.includes(' v-max') ||
+      nameLower.includes(' vmax') ||
+      nameLower.includes(' v-star') ||
+      nameLower.includes(' vstar') ||
+      nameLower.includes('rainbow') ||
+      nameLower.includes(' gold ') ||
+      nameLower.includes('secret') ||
+      nameLower.includes(' v ') ||  // " V " with spaces to avoid matching "very" etc
+      cardName.endsWith(' V') ||      // Ends with V
+      nameLower.includes('ultra')) {
+    return 'ultra-rare';
+  }
+
+  // Rare patterns (Holo, Break, Prime, Legend, Star)
+  if (nameLower.includes('holo') ||
+      nameLower.includes(' break') ||
+      nameLower.includes(' prime') ||
+      nameLower.includes(' legend') ||
+      nameLower.includes(' \u2606') ||  // Star symbol
+      nameLower.includes('radiant') ||
+      nameLower.includes('amazing')) {
+    return 'rare';
+  }
+
+  // Uncommon patterns (based on set or card type hints)
+  if (nameLower.includes('reverse') ||
+      setName.toLowerCase().includes('promo')) {
+    return 'uncommon';
+  }
+
+  // Default to common
+  return 'common';
+}
+
+// PERFORMANCE: Cache card details to avoid repeated API calls
+const cardDetailsCache = new Map<string, { name: string; rarity: string }>();
+
+/**
+ * HOTFIX: Fetch card details from Pokemon TCG API by ID (with caching)
+ * Returns card name and rarity
+ */
+async function fetchCardDetails(cardId: string): Promise<{ name: string; rarity: string } | null> {
+  // Check cache first
+  if (cardDetailsCache.has(cardId)) {
+    return cardDetailsCache.get(cardId)!;
+  }
+
+  try {
+    const response = await fetch(`https://api.pokemontcg.io/v2/cards/${cardId}`);
+    if (!response.ok) {
+      console.warn(`[SessionCardManager] Failed to fetch card details for ${cardId}`);
+      return null;
+    }
+    const data = await response.json();
+    const result = {
+      name: data.data.name || 'Unknown',
+      rarity: data.data.rarity || 'Common'
+    };
+
+    // Cache the result
+    cardDetailsCache.set(cardId, result);
+    return result;
+  } catch (error) {
+    console.error(`[SessionCardManager] Error fetching card details:`, error);
+    return null;
+  }
+}
+
+/**
+ * Normalize API rarity string to our internal format
+ */
+function normalizeRarity(apiRarity: string): 'common' | 'uncommon' | 'rare' | 'ultra-rare' {
+  const rarityLower = apiRarity.toLowerCase();
+
+  if (rarityLower.includes('common')) return 'common';
+  if (rarityLower.includes('uncommon')) return 'uncommon';
+
+  // Ultra-rare indicators
+  if (rarityLower.includes('ultra') ||
+      rarityLower.includes('secret') ||
+      rarityLower.includes('rainbow')) {
+    return 'ultra-rare';
+  }
+
+  // Rare (but not ultra-rare)
+  if (rarityLower.includes('rare')) {
+    return 'rare';
+  }
+
+  // Default to common
+  return 'common';
+}
+
+/**
  * Initialize session card manager
  * Called on website load
  */
@@ -625,31 +729,48 @@ export function removeCardsFromSession(cardIds: string[]): void {
 
 /**
  * Convert session cards to format needed by pack opener
+ * HOTFIX: Now async to fetch real card names and rarities from API
  */
-export function convertSessionCardToCardData(sessionCards: SessionCard[]): any[] {
-  console.log(`[SessionCardManager] Converting ${sessionCards.length} session cards to CardData format`);
-  
-  return sessionCards.map(sessionCard => {
+export async function convertSessionCardToCardData(sessionCards: SessionCard[]): Promise<any[]> {
+  console.log(`[SessionCardManager HOTFIX] Fetching real card details for ${sessionCards.length} cards from Pokemon TCG API...`);
+
+  // Fetch all card details in parallel for speed
+  const cardDetailsPromises = sessionCards.map(card => fetchCardDetails(card.id));
+  const cardDetailsResults = await Promise.all(cardDetailsPromises);
+
+  return sessionCards.map((sessionCard, index) => {
     // Ensure we have valid image data
     if (!sessionCard.imageData) {
       console.warn(`[SessionCardManager] Card ${sessionCard.id} has no imageData!`);
     }
-    
-    // Create a card name based on set and number
-    const cardName = `${sessionCard.set_name} #${sessionCard.card_number}`;
-    
-    // Create a basic card object that matches the expected format
+
+    const cardDetails = cardDetailsResults[index];
+
+    // Use real card name from API if available, otherwise use fallback
+    const cardName = cardDetails?.name || `${sessionCard.set_name} #${sessionCard.card_number}`;
+    const apiRarity = cardDetails?.rarity;
+
+    // Normalize rarity or fall back to pattern matching
+    let detectedRarity: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
+    if (apiRarity) {
+      detectedRarity = normalizeRarity(apiRarity);
+      console.log(`[SessionCardManager] ✓ ${cardName}: "${apiRarity}" → ${detectedRarity}`);
+    } else {
+      detectedRarity = detectRarityFromPattern(cardName, sessionCard.set_name);
+      console.log(`[SessionCardManager] ⚠ ${cardName}: Pattern detected as ${detectedRarity} (API fetch failed)`);
+    }
+
     return {
       id: sessionCard.id,
       card: {
         id: sessionCard.id,
-        name: cardName,
+        name: cardName,  // Real card name from API
         set: {
           id: sessionCard.set_id,
           name: sessionCard.set_name
         },
         number: sessionCard.card_number,
-        rarity: "Unknown",  // Placeholder until API call
+        rarity: apiRarity || detectedRarity,  // Use API rarity string
         images: {
           small: sessionCard.imageData || sessionCard.image_url,
           large: sessionCard.imageData || sessionCard.image_url
@@ -660,8 +781,8 @@ export function convertSessionCardToCardData(sessionCards: SessionCard[]): any[]
         types: [],
         attacks: []
       },
-      rarity: 'common',  // Default rarity until API call
-      
+      rarity: detectedRarity,  // Normalized rarity for pack generation
+
       // Add special properties for session cards
       isSessionCard: true,
       imageData: sessionCard.imageData,

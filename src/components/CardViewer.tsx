@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Hammer from 'hammerjs';
 import gsap from 'gsap';
 import { CardData } from '@/types/pokemon';
-import { PokemonCard } from './PokemonCard';
+import { HolographicPokemonCard } from './HolographicPokemonCard';
 import { Heart, X } from 'lucide-react';
+import { audioManager } from '@/lib/audioManager';
 
 interface CardViewerProps {
   cards: CardData[];
@@ -80,14 +81,17 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
   const handleCardReveal = () => {
     if (isAnimating) return;
-    
+
     try {
       // Toggle the revealed state
       setIsRevealed(!isRevealed);
-      
+
+      // Play card reveal sound
+      audioManager.play('card-reveal');
+
       // Add a subtle flip animation
       if (cardRef.current) {
-        gsap.fromTo(cardRef.current, 
+        gsap.fromTo(cardRef.current,
           { scale: 0.95, opacity: 0.8 },
           { scale: 1, opacity: 1, duration: 0.3, ease: 'power2.out' }
         );
@@ -231,14 +235,45 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, isAnimating, swipeCard]);
 
-  // Card enter animation
+  // Card enter animation - enhanced flying effect
   useEffect(() => {
     if (cardRef.current) {
-      gsap.fromTo(
-        cardRef.current,
-        { scale: 0.8, opacity: 0 },
-        { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(1.2)' }
-      );
+      // First card gets dramatic flying entrance, subsequent cards get simpler animation
+      const isFirstCard = currentIndex === 0;
+
+      if (isFirstCard) {
+        // Dramatic flying entrance from pack burst position
+        gsap.fromTo(
+          cardRef.current,
+          {
+            y: -window.innerHeight * 0.6, // Start from top (pack position)
+            x: (Math.random() - 0.5) * 100, // Random horizontal offset
+            scale: 0.5,
+            opacity: 0,
+            rotation: -45 + Math.random() * 90, // Random rotation
+          },
+          {
+            y: 0,
+            x: 0,
+            scale: 1,
+            opacity: 1,
+            rotation: 0,
+            duration: 0.8,
+            ease: 'power2.out',
+            // Bezier path for arc trajectory
+            motionPath: {
+              curviness: 1.5,
+            }
+          }
+        );
+      } else {
+        // Simpler enter animation for subsequent cards
+        gsap.fromTo(
+          cardRef.current,
+          { scale: 0.8, opacity: 0, y: 20 },
+          { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.2)' }
+        );
+      }
     }
     // Reset revealed state for new card
     setIsRevealed(false);
@@ -282,7 +317,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           {currentIndex < cards.length - 1 && cards[currentIndex + 1] && cards[currentIndex + 1].card ? (
             <div className="opacity-30 scale-95 blur-sm transform translate-y-2">
-              <PokemonCard card={cards[currentIndex + 1]} showBack />
+              <HolographicPokemonCard card={cards[currentIndex + 1]} showBack enableHolographic={false} />
             </div>
           ) : null}
         </div>
@@ -305,17 +340,17 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           {!isRevealed ? (
             // Show actual Pokemon card back - same size as normal card
             <div style={{ backfaceVisibility: 'hidden' }}>
-              <PokemonCard card={currentCard} showBack={true} />
+              <HolographicPokemonCard card={currentCard} showBack={true} enableHolographic={false} />
             </div>
           ) : currentCard?.card?.images ? (
             // Show actual card after reveal - with validation to prevent errors
             <div style={{ backfaceVisibility: 'hidden' }}>
-              <PokemonCard card={currentCard} showBack={false} />
+              <HolographicPokemonCard card={currentCard} showBack={false} size="large" />
             </div>
           ) : (
             // Fallback if card data is incomplete
             <div style={{ backfaceVisibility: 'hidden' }}>
-              <PokemonCard card={currentCard} showBack={true} />
+              <HolographicPokemonCard card={currentCard} showBack={true} enableHolographic={false} />
             </div>
           )}
         </div>
@@ -338,6 +373,24 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           <X className="w-16 h-16 text-gray-500 drop-shadow-2xl" />
         </div>
       </div>
+
+      {/* Custom Card Flavor Text - only shown for custom cards */}
+      {isRevealed && currentCard?.card && 'isCustom' in currentCard.card && currentCard.card.isCustom && 'customData' in currentCard.card && currentCard.card.customData?.flavorText && (
+        <div className="w-full max-w-md mx-auto mb-6 px-4">
+          <div className="bg-gradient-to-r from-yellow-500/20 via-amber-500/20 to-yellow-500/20 p-1 rounded-lg animate-pulse">
+            <div className="bg-card/95 backdrop-blur-sm rounded-md p-4 border-2 border-yellow-400/50">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-yellow-400 text-xl">✨</span>
+                <h3 className="text-sm font-bold text-yellow-400">Special Memory</h3>
+                <span className="text-yellow-400 text-xl">✨</span>
+              </div>
+              <p className="text-sm text-foreground/90 italic leading-relaxed">
+                "{currentCard.card.customData.flavorText}"
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Controls area - positioned directly below card */}
       <div className="flex flex-col items-center gap-4 pb-8">

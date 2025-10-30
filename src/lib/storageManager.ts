@@ -19,6 +19,11 @@ class UniversalStorage {
    * Detect the best available storage mechanism
    */
   private detectBestStorage(): void {
+    if (typeof window === 'undefined') {
+      this.activeStorage = 'memory';
+      this.initialized = true;
+      return;
+    }
     // Try sessionStorage first
     if (this.testStorage('sessionStorage')) {
       this.activeStorage = 'session';
@@ -45,6 +50,9 @@ class UniversalStorage {
    * Test if a storage mechanism is available and working
    */
   private testStorage(type: 'sessionStorage' | 'localStorage'): boolean {
+    if (typeof window === 'undefined') {
+      return false;
+    }
     try {
       const storage = window[type];
       const testKey = '__storage_test__';
@@ -77,9 +85,9 @@ class UniversalStorage {
     try {
       switch (this.activeStorage) {
         case 'session':
-          return window.sessionStorage.getItem(key);
+          return typeof window !== 'undefined' ? window.sessionStorage.getItem(key) : null;
         case 'local':
-          return window.localStorage.getItem(key);
+          return typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
         case 'memory':
           return this.memoryStore.get(key) || null;
         default:
@@ -99,9 +107,11 @@ class UniversalStorage {
     try {
       switch (this.activeStorage) {
         case 'session':
+          if (typeof window === 'undefined') return false;
           window.sessionStorage.setItem(key, value);
           return true;
         case 'local':
+          if (typeof window === 'undefined') return false;
           window.localStorage.setItem(key, value);
           return true;
         case 'memory':
@@ -120,12 +130,14 @@ class UniversalStorage {
         if (this.activeStorage !== 'memory') {
           this.clearOldestItems(key);
           try {
-            if (this.activeStorage === 'session') {
-              window.sessionStorage.setItem(key, value);
-            } else {
-              window.localStorage.setItem(key, value);
+            if (typeof window !== 'undefined') {
+              if (this.activeStorage === 'session') {
+                window.sessionStorage.setItem(key, value);
+              } else {
+                window.localStorage.setItem(key, value);
+              }
+              return true;
             }
-            return true;
           } catch (retryError) {
             console.error('[Storage] Retry failed, falling back to memory');
             this.activeStorage = 'memory';
@@ -149,10 +161,14 @@ class UniversalStorage {
     try {
       switch (this.activeStorage) {
         case 'session':
-          window.sessionStorage.removeItem(key);
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.removeItem(key);
+          }
           break;
         case 'local':
-          window.localStorage.removeItem(key);
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(key);
+          }
           break;
         case 'memory':
           this.memoryStore.delete(key);
@@ -170,10 +186,14 @@ class UniversalStorage {
     try {
       switch (this.activeStorage) {
         case 'session':
-          window.sessionStorage.clear();
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.clear();
+          }
           break;
         case 'local':
-          window.localStorage.clear();
+          if (typeof window !== 'undefined') {
+            window.localStorage.clear();
+          }
           break;
         case 'memory':
           this.memoryStore.clear();
@@ -191,9 +211,9 @@ class UniversalStorage {
     try {
       switch (this.activeStorage) {
         case 'session':
-          return Object.keys(window.sessionStorage);
+          return typeof window !== 'undefined' ? Object.keys(window.sessionStorage) : [];
         case 'local':
-          return Object.keys(window.localStorage);
+          return typeof window !== 'undefined' ? Object.keys(window.localStorage) : [];
         case 'memory':
           return Array.from(this.memoryStore.keys());
         default:

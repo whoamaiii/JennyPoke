@@ -1,0 +1,111 @@
+{
+  "cards": [
+    {
+      "id": "custom-001",
+      "baseCardId": "base1-58",
+      "name": "First Date Pikachu",
+      "nickname": "Sparky",
+      "hp": "60",
+      "type": "Electric",
+      "rarity": "Rare Holo",
+      "attacks": [
+        {
+          "name": "Cafe Spark",
+          "damage": "30",
+          "description": "Where it all began",
+          "cost": ["Electric"]
+        },
+        {
+          "name": "Memory Bolt",
+          "damage": "60",
+          "description": "Never forget that special moment"
+        }
+      ],
+      "flavorText": "The coffee shop where our adventure started. Remember that first smile?",
+      "assignedDay": 1,
+      "category": "milestone"
+    },
+    {
+      "id": "custom-024",
+      "baseCardId": "base1-4",
+      "name": "Forever Charizard",
+      "nickname": "Eternal Flame",
+      "hp": "150",
+      "type": "Fire",
+      "rarity": "Secret Rare",
+      "attacks": [
+        {
+          "name": "Eternal Flame",
+          "damage": "150",
+          "description": "A love that burns forever",
+          "cost": ["Fire", "Fire", "Colorless", "Colorless"]
+        },
+        {
+          "name": "Promise Burn",
+          "damage": "200",
+          "description": "Our future together"
+        }
+      ],
+      "flavorText": "Merry Christmas! My love for you burns as bright as Charizard's flames - eternal and unstoppable.",
+      "assignedDay": 24,
+      "category": "ultra-rare"
+    },
+    {
+      "id": "custom-002",
+      "baseCardId": "xy1-10",
+      "name": "Holiday Eevee",
+      "nickname": "Snowy",
+      "hp": "50",
+      "type": "Colorless",
+      "rarity": "Rare",
+      "attacks": [
+        {
+          "name": "Christmas Cuddle",
+          "damage": "20",
+          "description": "Warm winter nights together"
+        }
+      ],
+      "flavorText": "Cozy winter evenings, hot chocolate, and you.",
+      "assignedDay": 2,
+      "category": "holiday"
+    },
+    {
+      "id": "custom-007",
+      "baseCardId": "base1-7",
+      "name": "Adventure Squirtle",
+      "nickname": "Explorer",
+      "hp": "40",
+      "type": "Water",
+      "rarity": "Uncommon",
+      "attacks": [
+        {
+          "name": "Journey Splash",
+          "damage": "25",
+          "description": "Every adventure we take together"
+        }
+      ],
+      "flavorText": "Remember our road trip? Every mile was an adventure with you.",
+      "assignedDay": 7,
+      "category": "milestone"
+    },
+    {
+      "id": "custom-014",
+      "baseCardId": "xy5-1",
+      "name": "Valentine Jigglypuff",
+      "nickname": "Lovesong",
+      "hp": "60",
+      "type": "Fairy",
+      "rarity": "Rare Holo",
+      "attacks": [
+        {
+          "name": "Love Serenade",
+          "damage": "40",
+          "description": "Your laughter is my favorite song"
+        }
+      ],
+      "flavorText": "Your smile makes my heart sing louder than any Jigglypuff's song.",
+      "assignedDay": 14,
+      "category": "holiday"
+    }
+  ]
+}
