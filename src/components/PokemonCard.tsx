@@ -163,6 +163,7 @@ export const PokemonCard = ({ card, className, style, showBack = false, size = '
             src={imgSrc}
             alt={tcgCard.name}
             loading="lazy"
+            fetchPriority={showBack ? 'low' : 'high'}
             onLoad={() => setLoaded(true)}
             className={cn(getImageClasses(), 'transition-all duration-500', loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105')}
           />
