@@ -47,6 +47,7 @@ const Index = () => {
   const viewRootRef = useRef<HTMLDivElement | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [packVariant, setPackVariant] = useState<'standard' | 'rare' | 'ultra'>('standard');
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
@@ -79,21 +80,36 @@ const Index = () => {
     };
   }, [abortController]);
 
-  // Simple initialization on mount
+  // Simple initialization on mount (become interactive as soon as 1 pack is ready)
   useEffect(() => {
     let isMounted = true;
+    let intervalId: number | null = null;
 
     const initialize = async () => {
       try {
         const { initializeSessionCards, getSessionStats } = await import('@/services/sessionCardManager');
 
-        // Start initialization (downloads cards if needed)
-        await initializeSessionCards();
+        // Start initialization (non-blocking) so we can become interactive earlier
+        initializeSessionCards();
 
-        if (isMounted) {
-          const stats = getSessionStats();
-          console.log('[Index] Initialized with', stats.totalCards, 'cards');
-          setIsInitialized(true);
+        const checkReady = () => {
+          try {
+            const stats = getSessionStats();
+            // Ready when we have at least one full pack available
+            const ready = stats.availableCards >= 8;
+            if (ready && isMounted) {
+              setIsInitialized(true);
+              if (intervalId) window.clearInterval(intervalId);
+              intervalId = null;
+            }
+          } catch {}
+        };
+
+        // Check immediately, then poll briefly until ready
+        checkReady();
+        if (!isMounted) return;
+        if (!intervalId) {
+          intervalId = window.setInterval(checkReady, 300);
         }
       } catch (error) {
         console.error('[Index] Error during initialization:', error);
@@ -108,6 +124,7 @@ const Index = () => {
 
     return () => {
       isMounted = false;
+      if (intervalId) window.clearInterval(intervalId);
     };
   }, []);
 
@@ -176,6 +193,26 @@ const Index = () => {
       // Convert session cards to card data format
       const cards = convertSessionCardToCardData(sessionCards);
       console.log(`✅ Pack opened from session in ${duration}s with ${cards.length} cards`);
+
+      // Determine pack variant (best-effort) before showing animation
+      try {
+        const { computePackTierFromKnown, computePackVariant } = await import('@/lib/rarity');
+        // Immediate best guess
+        const initialVariant = computePackTierFromKnown(cards);
+        setPackVariant(initialVariant);
+        // Refine asynchronously (handles session cards with unknown rarity)
+        // Ensure we cancel any previous rarity computation
+        if (abortController) {
+          abortController.abort();
+        }
+        const controller = new AbortController();
+        setAbortController(controller);
+        const variant = await computePackVariant(cards, controller.signal);
+        setPackVariant(variant);
+      } catch (e) {
+        // Fallback to standard if anything goes wrong
+        setPackVariant('standard');
+      }
       
       // Mark these cards as shown
       markCardsAsShown(sessionCards.map(card => card.id));
@@ -345,7 +382,7 @@ const Index = () => {
           )}
 
           {view === 'opening' && (
-            <PackOpening onComplete={() => setView('viewing')} />
+            <PackOpening variant={packVariant} onComplete={() => setView('viewing')} />
           )}
 
           {view === 'viewing' && currentPack.length > 0 && (

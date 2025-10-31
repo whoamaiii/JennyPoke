@@ -8,15 +8,14 @@
 import { CardCSVRow, SessionCard, SessionCardState } from '@/types/pokemon';
 import { getRandomPendingCards } from './csvManager';
 import { toast } from 'sonner';
-import { downloadAndCompressImage, createImagePlaceholder } from '@/lib/imageUtils';
+import { downloadAndCompressImage, createImagePlaceholder, ImageCompressionOptions, compressImage } from '@/lib/imageUtils';
 import { universalStorage, isStorageCriticallyLow } from '@/lib/storageManager';
 
 // Constants
 const SESSION_STORAGE_KEY = 'pokemon_session_cards';
-const CONCURRENT_DOWNLOADS = 4; // Number of concurrent image downloads (reduced for stability)
 const CARDS_TO_LOAD = 32; // Maximum number of cards to keep in session storage
 const REFRESH_THRESHOLD = 16; // Number of available cards before triggering a refresh
-const INITIAL_LOAD = 24; // Number of cards to load initially
+const BASE_INITIAL_LOAD = 24; // Default initial cards to load (tuned dynamically)
 const PACK_SIZE = 8; // Number of cards in a pack
 // Removed retry logic - grab another card on first failure
 const DOWNLOAD_TIMEOUT = 10000; // 10 second timeout per download
@@ -24,6 +23,48 @@ const DOWNLOAD_TIMEOUT = 10000; // 10 second timeout per download
 // State management
 let isInitialized = false;
 let isDownloading = false;
+
+/**
+ * Determine optimal download/compression settings based on network and device
+ */
+function getDownloadConfig(): {
+  concurrency: number;
+  initialLoad: number;
+  compression: ImageCompressionOptions;
+} {
+  const connection: any = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+  const effectiveType = connection?.effectiveType as string | undefined; // 'slow-2g' | '2g' | '3g' | '4g'
+  const saveData = Boolean(connection?.saveData);
+  const cores = Math.max(1, (navigator as any).hardwareConcurrency || 4);
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+
+  // Concurrency tuning
+  let concurrency = 4;
+  if (saveData || effectiveType === '2g' || effectiveType === 'slow-2g') concurrency = 2;
+  else if (effectiveType === '3g') concurrency = 3;
+  else if (effectiveType === '4g') concurrency = Math.min(8, Math.max(4, Math.floor(cores / 2)));
+
+  // Initial load tuning (download fewer on poor networks to get interactive faster)
+  let initialLoad = BASE_INITIAL_LOAD;
+  if (saveData || effectiveType === '2g' || effectiveType === 'slow-2g') initialLoad = 8;
+  else if (effectiveType === '3g') initialLoad = 16;
+
+  // Compression tuning (smaller on poor networks, a bit larger on HiDPI)
+  const targetWidth = Math.round( (effectiveType === '4g' ? 560 : effectiveType === '3g' ? 520 : 480) * dpr );
+  const targetHeight = Math.round(targetWidth * (3/4)); // maintain typical card aspect
+  const quality = saveData ? 0.72 : effectiveType === '4g' ? 0.84 : effectiveType === '3g' ? 0.8 : 0.76;
+
+  return {
+    concurrency,
+    initialLoad,
+    compression: {
+      maxWidth: targetWidth,
+      maxHeight: targetHeight,
+      quality,
+      format: 'webp'
+    }
+  };
+}
 
 /**
  * Initialize session card manager
@@ -211,14 +252,14 @@ async function tryDownloadImage(imageUrl: string): Promise<Blob | null> {
 async function downloadCardImage(card: CardCSVRow): Promise<SessionCard | null> {
   try {
     console.log(`[SessionCardManager] Downloading and compressing card image: ${card.set_id}-${card.card_number} from ${card.image_url}`);
-    
-    // Use the new image compression utility with higher quality for better image clarity
-    const compressedResult = await downloadAndCompressImage(card.image_url, {
-      maxWidth: 600,
-      maxHeight: 450,
-      quality: 0.85,
-      format: 'webp'
-    });
+    const { compression } = getDownloadConfig();
+
+    // Fetch the image with fallbacks (hires -> standard -> small), then compress
+    const fetchedBlob = await tryDownloadImage(card.image_url);
+    if (!fetchedBlob) {
+      throw new Error('All image fetch strategies failed');
+    }
+    const compressedResult = await compressImage(fetchedBlob, compression);
     
     console.log(`[SessionCardManager] ✓ Card ${card.set_id}-${card.card_number} compressed: ${compressedResult.originalSize} → ${compressedResult.compressedSize} bytes (${compressedResult.compressionRatio.toFixed(1)}% reduction)`);
     
@@ -243,9 +284,9 @@ async function downloadCardImage(card: CardCSVRow): Promise<SessionCard | null> 
 /**
  * Download multiple card images in parallel
  */
-async function downloadCardBatch(cards: CardCSVRow[]): Promise<SessionCard[]> {
+async function downloadCardBatch(cards: CardCSVRow[], onBatchComplete?: (successful: SessionCard[], completed: number, total: number) => void): Promise<SessionCard[]> {
   // Split cards into smaller batches for parallel processing
-  const batchSize = CONCURRENT_DOWNLOADS;
+  const { concurrency: batchSize } = getDownloadConfig();
   const batches: CardCSVRow[][] = [];
   
   for (let i = 0; i < cards.length; i += batchSize) {
@@ -272,6 +313,11 @@ async function downloadCardBatch(cards: CardCSVRow[]): Promise<SessionCard[]> {
     // Report progress if more than 25% of cards loaded
     if (sessionCards.length >= totalCards * 0.25 && sessionCards.length % 10 === 0) {
       toast.info(`Downloaded ${sessionCards.length} card images for offline play.`);
+    }
+
+    // Allow incremental handling by caller (e.g., early save)
+    if (onBatchComplete && successfulCards.length > 0) {
+      onBatchComplete(successfulCards, completedCount, totalCards);
     }
   }
   
@@ -310,7 +356,8 @@ export async function refreshSessionCards(isInitialLoad = false): Promise<boolea
     }
     
     // Download in multiples of 8 (pack size) to stay within available slots
-    const maxCardsToDownload = isInitialLoad ? INITIAL_LOAD : Math.min(availableSlots, CARDS_TO_LOAD);
+    const tunedInitial = getDownloadConfig().initialLoad;
+    const maxCardsToDownload = isInitialLoad ? tunedInitial : Math.min(availableSlots, CARDS_TO_LOAD);
     const cardsToDownload = Math.floor(maxCardsToDownload / PACK_SIZE) * PACK_SIZE;
     
     if (cardsToDownload === 0) {
@@ -342,8 +389,15 @@ export async function refreshSessionCards(isInitialLoad = false): Promise<boolea
     
     toast.info(`Downloading ${randomCards.length} cards for offline play...`);
     
-    // Download images
-    const newSessionCards = await downloadCardBatch(randomCards);
+    // Download images with incremental saves so packs can open sooner
+    let cumulativeNewCards: SessionCard[] = [];
+    const newSessionCards = await downloadCardBatch(randomCards, (successfulCards) => {
+      cumulativeNewCards = [...successfulCards, ...cumulativeNewCards];
+      // Incrementally persist to storage to make cards available ASAP
+      const partialState = getSessionState();
+      partialState.cards = [...successfulCards, ...partialState.cards].slice(0, CARDS_TO_LOAD);
+      saveSessionState(partialState);
+    });
     console.log(`[SessionCardManager] Successfully downloaded ${newSessionCards.length} out of ${randomCards.length} attempted`);
     
     if (newSessionCards.length === 0) {

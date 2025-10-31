@@ -3,7 +3,8 @@ import Hammer from 'hammerjs';
 import gsap from 'gsap';
 import { CardData } from '@/types/pokemon';
 import { PokemonCard } from './PokemonCard';
-import { Heart, X } from 'lucide-react';
+import { Heart, X, Sparkles } from 'lucide-react';
+import { getRarityForCardData } from '@/lib/rarity';
 
 interface CardViewerProps {
   cards: CardData[];
@@ -19,6 +20,14 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const heartRef = useRef<HTMLDivElement>(null);
   const skipRef = useRef<HTMLDivElement>(null);
+  const rareOverlayRef = useRef<HTMLDivElement>(null);
+  const rareBadgeRef = useRef<HTMLDivElement>(null);
+  const ultraOverlayRef = useRef<HTMLDivElement>(null);
+  const rarityAbortRef = useRef<AbortController | null>(null);
+
+  const [fetchedRarityById, setFetchedRarityById] = useState<Record<string, CardData['rarity']>>({});
+  const [rareLabel, setRareLabel] = useState<string>('Rare!');
+  const [rareLiveText, setRareLiveText] = useState<string>('');
 
   const currentCard = cards[currentIndex];
 
@@ -78,12 +87,99 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
     }
   };
 
-  const handleCardReveal = () => {
+  const ensureRarity = async (card: CardData): Promise<CardData['rarity']> => {
+    const id = card.card.id;
+    if (fetchedRarityById[id]) return fetchedRarityById[id];
+
+    // If card already has a non-basic rarity, use it
+    if (card.rarity && (card.rarity === 'rare' || card.rarity === 'ultra-rare')) {
+      return card.rarity;
+    }
+
+    // Session cards may not have true rarity; fetch minimal details
+    const isSessionCard = (card as any).isSessionCard === true;
+    if (!isSessionCard) return card.rarity || 'common';
+
+    // Abort any in-flight rarity request
+    if (rarityAbortRef.current) {
+      rarityAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    rarityAbortRef.current = controller;
+
+    try {
+      const apiRarity = await getRarityForCardData(card, controller.signal);
+      setFetchedRarityById(prev => ({ ...prev, [id]: apiRarity }));
+      return apiRarity;
+    } catch {
+      return card.rarity || 'common';
+    } finally {
+      if (rarityAbortRef.current === controller) {
+        rarityAbortRef.current = null;
+      }
+    }
+  };
+
+  const animateRareReveal = (tier: 'rare' | 'ultra-rare') => {
+    setRareLabel(tier === 'ultra-rare' ? 'Ultra Rare!' : 'Rare!');
+    setRareLiveText(tier === 'ultra-rare' ? 'Ultra rare card revealed' : 'Rare card revealed');
+    if (!cardRef.current) return;
+
+    // Card glow pulse
+    gsap.fromTo(
+      cardRef.current,
+      { boxShadow: '0 0 0px rgba(255, 215, 0, 0)', filter: 'saturate(1)' },
+      {
+        boxShadow: tier === 'ultra-rare'
+          ? '0 0 60px rgba(255, 215, 0, 0.95), 0 0 120px rgba(99, 102, 241, 0.6)'
+          : '0 0 40px rgba(255, 215, 0, 0.85)',
+        filter: 'saturate(1.15)',
+        duration: 0.35,
+        yoyo: true,
+        repeat: 1,
+        ease: 'power2.out',
+      }
+    );
+
+    // Background radial burst
+    const overlay = tier === 'ultra-rare' ? ultraOverlayRef.current : rareOverlayRef.current;
+    if (overlay) {
+      gsap.fromTo(
+        overlay,
+        { opacity: 0, scale: 0.8 },
+        { opacity: 1, scale: 1.05, duration: 0.35, ease: 'back.out(1.6)' }
+      );
+      gsap.to(overlay, { opacity: 0, duration: 0.6, delay: 0.45, ease: 'power1.out' });
+    }
+
+    // Sparkles badge pop
+    if (rareBadgeRef.current) {
+      gsap.fromTo(
+        rareBadgeRef.current,
+        { opacity: 0, scale: 0.6, y: -8, rotate: -10 },
+        { opacity: 1, scale: 1, y: 0, rotate: 0, duration: 0.3, ease: 'back.out(1.7)' }
+      );
+      gsap.to(rareBadgeRef.current, { opacity: 0, scale: 0.9, duration: 0.4, delay: 0.8 });
+    }
+  };
+
+  // Abort any in-flight rarity request when card index changes or on unmount
+  useEffect(() => {
+    return () => {
+      if (rarityAbortRef.current) {
+        rarityAbortRef.current.abort();
+        rarityAbortRef.current = null;
+      }
+    };
+  }, [currentIndex]);
+
+  const handleCardReveal = async () => {
     if (isAnimating) return;
     
     try {
       // Toggle the revealed state
-      setIsRevealed(!isRevealed);
+      const willReveal = !isRevealed;
+      setIsRevealed(willReveal);
       
       // Add a subtle flip animation
       if (cardRef.current) {
@@ -91,6 +187,14 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           { scale: 0.95, opacity: 0.8 },
           { scale: 1, opacity: 1, duration: 0.3, ease: 'power2.out' }
         );
+      }
+
+      // If revealing the front, check rarity and animate if special
+      if (willReveal && currentCard) {
+        const rarity = await ensureRarity(currentCard);
+        if (rarity === 'rare' || rarity === 'ultra-rare') {
+          animateRareReveal(rarity);
+        }
       }
     } catch (error) {
       console.error('Error flipping card:', error);
@@ -277,6 +381,7 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
 
   return (
     <div ref={containerRef} className="relative w-full h-screen flex flex-col overflow-hidden">
+      <div className="sr-only" role="status" aria-live="polite">{rareLiveText}</div>
       {/* Card area - top section */}
       <div className="flex-1 flex items-center justify-center relative min-h-0">
         {/* Card stack background */}
@@ -287,6 +392,14 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
             </div>
           ) : null}
         </div>
+
+      {/* Rare reveal overlays */}
+      <div ref={rareOverlayRef} className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{ opacity: 0 }}>
+        <div className="w-[70vw] max-w-[520px] aspect-square rounded-full bg-gradient-radial from-yellow-300/40 via-yellow-200/15 to-transparent blur-2xl" />
+      </div>
+      <div ref={ultraOverlayRef} className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{ opacity: 0 }}>
+        <div className="w-[80vw] max-w-[560px] aspect-square rounded-full bg-gradient-radial from-yellow-300/45 via-indigo-400/25 to-transparent blur-2xl" />
+      </div>
 
         {/* Current card */}
         <div
@@ -337,6 +450,12 @@ export const CardViewer = ({ cards, onSwipe, onComplete }: CardViewerProps) => {
           style={{ opacity: 0 }}
         >
           <X className="w-16 h-16 text-gray-500 drop-shadow-2xl" />
+        </div>
+
+        {/* Rare badge overlay */}
+        <div ref={rareBadgeRef} className="absolute top-10 pointer-events-none flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 backdrop-blur text-yellow-300 border border-yellow-400/40 shadow-xl" style={{ opacity: 0 }}>
+          <Sparkles className="w-5 h-5 text-yellow-300" />
+          <span className="text-sm font-semibold tracking-wide">{rareLabel}</span>
         </div>
       </div>
 
